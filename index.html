@@ -290,9 +290,9 @@ select.finput{appearance:none;}
     <div class="slabel">Custom</div>
     <div class="card">
       <div class="custom-row">
-        <input class="tspin" type="number" id="cmin" min="0" max="99" value="1"/>
+        <input class="tspin" type="number" id="cmin" min="0" max="99" value="1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
         <span class="tsep">:</span>
-        <input class="tspin" type="number" id="csec" min="0" max="59" value="30"/>
+        <input class="tspin" type="number" id="csec" min="0" max="59" value="30" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
         <button class="tset-btn" onclick="applyCustom()">Set timer</button>
       </div>
       <div class="alarm-row">
@@ -315,7 +315,7 @@ select.finput{appearance:none;}
   <div class="page" id="page-library">
     <div id="lib-local-view">
       <button class="browse-db-btn" onclick="openDbBrowser()">🔍 Browse 3,240 exercises — works offline</button>
-      <input type="search" class="lib-search" id="lib-search" placeholder="Search my library..." oninput="renderLib()"/>
+      <input type="search" class="lib-search" id="lib-search" placeholder="Search my library..." oninput="renderLib()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       <div class="cat-row" id="cat-row"></div>
       <div id="lib-list"></div>
     </div>
@@ -325,7 +325,7 @@ select.finput{appearance:none;}
       </div>
       <div class="db-search-wrap">
         <span style="font-size:16px;color:var(--text3)">🔍</span>
-        <input type="text" id="db-search-input" placeholder="Search exercises..." oninput="dbSearchDebounced()"/>
+        <input type="text" id="db-search-input" placeholder="Search exercises..." oninput="dbSearchDebounced()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       </div>
       <div class="db-filter-row" id="db-filter-row"></div>
       <div class="db-filter-row" id="db-cat-row"></div>
@@ -375,7 +375,7 @@ select.finput{appearance:none;}
   <div class="float-sheet">
     <div class="float-handle"></div>
     <div class="sheet-title" id="session-modal-title">New session</div>
-    <div class="field"><label>Date</label><input type="date" class="finput" id="sess-date"/></div>
+    <div class="field"><label>Date</label><input type="date" class="finput" id="sess-date" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/></div>
     <div class="field-row2">
       <div class="field"><label>Time of day</label>
         <select class="finput" id="sess-tod">
@@ -395,7 +395,7 @@ select.finput{appearance:none;}
         </select>
       </div>
     </div>
-    <div class="field"><label>Label (optional)</label><input type="text" class="finput" id="sess-label" placeholder="e.g. Push day, Leg day..."/></div>
+    <div class="field"><label>Label (optional)</label><input type="text" class="finput" id="sess-label" placeholder="e.g. Push day, Leg day..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/></div>
     <div class="sheet-btns">
       <button class="sbtn" onclick="closeSessionModal()">Cancel</button>
       <button class="sbtn sbtn-orange" onclick="saveSession()">Save session</button>
@@ -410,7 +410,7 @@ select.finput{appearance:none;}
     <div class="sheet-title" id="ex-modal-title">Add exercise</div>
     <div class="field">
       <label>Exercise name</label>
-      <input type="text" class="finput" id="ex-name-in" placeholder="e.g. Dumbbell curl" oninput="filterSug()"/>
+      <input type="text" class="finput" id="ex-name-in" placeholder="e.g. Dumbbell curl" oninput="filterSug()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
     </div>
     <div id="sug-list" style="margin-bottom:8px;"></div>
     <div class="field">
@@ -432,13 +432,13 @@ select.finput{appearance:none;}
         </select>
       </div>
       <div class="field"><label>Reps</label>
-        <input type="number" class="finput" id="ex-reps-in" placeholder="8" min="1" max="100"/>
+        <input type="number" class="finput" id="ex-reps-in" placeholder="8" min="1" max="100" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       </div>
     </div>
     <div id="weight-section">
       <div class="field">
         <label id="weight-label">Weight (lbs)</label>
-        <input type="number" class="finput" id="ex-weight-in" placeholder="0" min="0" oninput="updateCalc()"/>
+        <input type="number" class="finput" id="ex-weight-in" placeholder="0" min="0" oninput="updateCalc()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
         <div class="weight-hint" id="weight-hint"></div>
       </div>
       <div class="calc-box" id="calc-box" style="display:none">
@@ -777,11 +777,13 @@ function buildExBlock(sess,ex,ei){
 
       const wInput=document.createElement('input');
       wInput.className='set-input';wInput.type='number';wInput.min='0';wInput.placeholder='—';wInput.value=sl.w||'';
+      wInput.setAttribute('autocomplete','off');wInput.setAttribute('autocorrect','off');wInput.setAttribute('autocapitalize','off');
       wInput.addEventListener('change',function(){sl.w=wInput.value;summaryDiv.innerHTML=getSummary();});
       row.appendChild(wInput);
 
       const rInput=document.createElement('input');
       rInput.className='set-input';rInput.type='number';rInput.min='1';rInput.max='200';rInput.placeholder='—';rInput.value=sl.r||'';
+      rInput.setAttribute('autocomplete','off');rInput.setAttribute('autocorrect','off');rInput.setAttribute('autocapitalize','off');
       rInput.addEventListener('change',function(){sl.r=rInput.value;summaryDiv.innerHTML=getSummary();});
       row.appendChild(rInput);
 
@@ -1151,12 +1153,34 @@ function buildPresets(){document.getElementById('preset-row').innerHTML=PRESETS.
 function selPreset(i){T.selPreset=i;buildPresets();loadTimer(PRESETS[i].ms);}
 function applyCustom(){const m=parseInt(document.getElementById('cmin').value)||0;const s=parseInt(document.getElementById('csec').value)||0;const ms=(m*60+s)*1000;if(ms<=0)return;T.selPreset=-1;buildPresets();loadTimer(ms);}
 function loadTimer(ms){timerReset();T.total=ms;T.remain=ms;drawTimer(ms);}
-function timerToggle(){
-  if(T.running){T.remain=T.remain-(Date.now()-T.startAt);clearInterval(T.iv);T.running=false;document.getElementById('t-start').textContent='Resume';document.getElementById('t-start').className='tbtn tbtn-primary';}
-  else{if(T.remain<=0)timerReset();T.startAt=Date.now();T.running=true;T.fired=false;document.getElementById('t-start').textContent='Pause';document.getElementById('t-start').className='tbtn tbtn-danger';document.getElementById('t-lap').style.display='';if(!T.laps.length)T.lapBase=T.total;T.iv=setInterval(timerTick,50);}
+/* Wake lock to keep screen on during timer */
+let wakeLock=null;
+async function requestWakeLock(){
+  try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');}}catch(e){}
 }
-function timerTick(){const rem=T.remain-(Date.now()-T.startAt);if(rem<=0){clearInterval(T.iv);T.running=false;T.remain=0;document.getElementById('t-start').textContent='Start';document.getElementById('t-start').className='tbtn tbtn-primary';document.getElementById('t-lap').style.display='none';drawTimer(0);if(!T.fired){T.fired=true;fireAlarm();}return;}drawTimer(rem);}
-function timerReset(){clearInterval(T.iv);T.running=false;T.fired=false;T.laps=[];T.remain=T.total;T.lapBase=T.total;document.getElementById('t-start').textContent='Start';document.getElementById('t-start').className='tbtn tbtn-primary';document.getElementById('t-lap').style.display='none';document.getElementById('laps-wrap').style.display='none';document.getElementById('laps-list').innerHTML='';document.getElementById('ring-fg').classList.remove('red');drawTimer(T.total);}
+function releaseWakeLock(){
+  try{if(wakeLock){wakeLock.release();wakeLock=null;}}catch(e){}
+}
+
+function timerToggle(){
+  if(T.running){
+    T.remain=T.remain-(Date.now()-T.startAt);clearInterval(T.iv);T.running=false;
+    document.getElementById('t-start').textContent='Resume';
+    document.getElementById('t-start').className='tbtn tbtn-primary';
+    releaseWakeLock();
+  } else {
+    if(T.remain<=0)timerReset();
+    T.startAt=Date.now();T.running=true;T.fired=false;
+    document.getElementById('t-start').textContent='Pause';
+    document.getElementById('t-start').className='tbtn tbtn-danger';
+    document.getElementById('t-lap').style.display='';
+    if(!T.laps.length)T.lapBase=T.total;
+    T.iv=setInterval(timerTick,50);
+    requestWakeLock();
+  }
+}
+function timerTick(){const rem=T.remain-(Date.now()-T.startAt);if(rem<=0){clearInterval(T.iv);T.running=false;T.remain=0;document.getElementById('t-start').textContent='Start';document.getElementById('t-start').className='tbtn tbtn-primary';document.getElementById('t-lap').style.display='none';drawTimer(0);if(!T.fired){T.fired=true;fireAlarm();}releaseWakeLock();return;}drawTimer(rem);}
+function timerReset(){clearInterval(T.iv);T.running=false;T.fired=false;releaseWakeLock();T.laps=[];T.remain=T.total;T.lapBase=T.total;document.getElementById('t-start').textContent='Start';document.getElementById('t-start').className='tbtn tbtn-primary';document.getElementById('t-lap').style.display='none';document.getElementById('laps-wrap').style.display='none';document.getElementById('laps-list').innerHTML='';document.getElementById('ring-fg').classList.remove('red');drawTimer(T.total);}
 function doLap(){if(!T.running)return;const rem=T.remain-(Date.now()-T.startAt);T.laps.push(T.lapBase-rem);T.lapBase=rem;renderLaps();}
 function drawTimer(ms){const ts=Math.ceil(ms/1000),m=Math.floor(ts/60),s=ts%60,h=Math.floor((ms%1000)/10);document.getElementById('t-disp').textContent=`${m}:${s.toString().padStart(2,'0')}`;document.getElementById('t-hun').textContent=`.${h.toString().padStart(2,'0')}`;document.getElementById('ring-fg').style.strokeDashoffset=CIRC*(1-Math.max(ms/T.total,0));document.getElementById('ring-fg').classList.toggle('red',ms<10000&&ms>0);}
 function renderLaps(){if(!T.laps.length)return;document.getElementById('laps-wrap').style.display='';const min=Math.min(...T.laps),max=Math.max(...T.laps);document.getElementById('laps-list').innerHTML=[...T.laps].reverse().map((lap,ri)=>{const i=T.laps.length-1-ri;const best=lap===min&&T.laps.length>1,worst=lap===max&&T.laps.length>1;const total=T.laps.slice(0,i+1).reduce((a,b)=>a+b,0);return`<div class="lap-row"><span class="lap-num">Lap ${i+1}</span><span class="lap-split ${best?'lap-best':worst?'lap-worst':''}">${fmtMs(lap)}</span><span class="lap-total">${fmtMs(total)}</span></div>`;}).join('');}
