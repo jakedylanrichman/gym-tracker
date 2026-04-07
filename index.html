@@ -217,6 +217,36 @@ select.finput{appearance:none;}
 
 .toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:14px;font-weight:600;padding:11px 22px;border-radius:50px;z-index:500;display:none;white-space:nowrap;}
 .card{background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);padding:16px;margin-bottom:12px;}
+/* COLLAPSIBLE SESSION */
+.sess-card{background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);margin-bottom:12px;overflow:hidden;transition:box-shadow .15s;}
+.sess-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none;-webkit-user-select:none;}
+.sess-bar:active{background:var(--bg2);}
+.sess-accent{height:4px;}
+.sess-chevron{transition:transform .22s;flex-shrink:0;margin-left:6px;}
+.sess-chevron.open{transform:rotate(180deg);}
+.sess-body{border-top:0.5px solid var(--border);display:none;}
+.sess-body.open{display:block;}
+/* INLINE SET TABLE */
+.set-grid{display:grid;grid-template-columns:20px 1fr 1fr 28px;gap:6px;align-items:center;padding:6px 16px;}
+.set-grid-head{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:2px;}
+.set-num-label{font-size:12px;color:var(--text3);text-align:center;}
+.set-input{padding:7px 4px;border-radius:var(--radius-xs);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);font-size:14px;text-align:center;width:100%;-moz-appearance:textfield;}
+.set-input::-webkit-inner-spin-button,.set-input::-webkit-outer-spin-button{-webkit-appearance:none;}
+.set-check{width:26px;height:26px;border-radius:50%;border:2px solid var(--border2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.set-check.done{background:var(--orange);border-color:var(--orange);}
+.ex-block{border-bottom:0.5px solid var(--border);}
+.ex-block-head{display:flex;align-items:center;justify-content:space-between;padding:11px 16px 8px;}
+.ex-block-name{font-size:15px;font-weight:600;flex:1;min-width:0;}
+/* DRAG HANDLE */
+.drag-handle{cursor:grab;padding:4px 6px;color:var(--text3);display:flex;align-items:center;touch-action:none;flex-shrink:0;}
+.drag-handle:active{cursor:grabbing;}
+.ex-block.dragging{opacity:.4;}
+.ex-block.drag-over{border-top:2px solid var(--orange);}
+/* SAVE BTN */
+.sess-save-btn{width:calc(100% - 32px);margin:10px 16px 14px;padding:13px;background:var(--orange);color:#fff;border:none;border-radius:50px;font-size:15px;font-weight:700;cursor:pointer;}
+.sess-save-btn:active{opacity:.85;}
+/* EXERCISE COUNT BADGE */
+.ex-count-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg2);color:var(--text2);}
 </style>
 </head>
 <body>
@@ -464,6 +494,7 @@ const DB_DIFFS=['all','Beginner','Novice','Intermediate','Advanced','Master','Ex
 
 /* ── STATE ── */
 let sessions=[];
+const openSessions=new Set();
 let customLibrary=[];
 let libCat='All';
 let currentEquip='barbell';
@@ -531,59 +562,258 @@ function renderSessions(){
   const todayVol=todaySess.reduce((a,s)=>a+sessVolume(s),0);
   if(todaySess.length){document.getElementById('summary-metrics').style.display='';document.getElementById('today-vol').textContent=Math.round(todayVol).toLocaleString();document.getElementById('today-count').textContent=todaySess.length;}
   else document.getElementById('summary-metrics').style.display='none';
+
   const groups={};
   sessions.forEach(s=>{(groups[s.date]=groups[s.date]||[]).push(s);});
   const sortedDates=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
-  let html='';
+  c.innerHTML='';
+
   sortedDates.forEach(date=>{
-    html+=`<div class="slabel">${fmtDate(date)}</div>`;
-    groups[date].forEach(sess=>{
-      const vol=sessVolume(sess);
-      html+=`<div class="sess-card">
-        <div class="sess-accent" style="background:${accentColor(sess.tod)}"></div>
-        <div class="sess-head">
-          <div class="sess-head-top">
-            <div>
-              <div class="sess-title">${sess.label||sess.tod+' session'}</div>
-              <div class="sess-meta">
-                <span class="tod-pill tod-${sess.tod.toLowerCase()}">${sess.tod}</span>
-                <span class="sess-meta-item">⏱ ${sess.dur}</span>
-                ${vol>0?`<span class="sess-meta-item">${Math.round(vol).toLocaleString()} lbs</span>`:''}
-              </div>
-            </div>
-            <div class="sess-icon-btns">
-              <button class="icon-btn" onclick="openEditSession('${sess.id}')" style="color:var(--text2)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3L11 2z"/></svg></button>
-              <button class="icon-btn icon-btn-red" onclick="confirmDeleteSession('${sess.id}')" style="color:var(--orange)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="2,4 14,4"/><path d="M5 4V2.5a.5.5 0 01.5-.5h5a.5.5 0 01.5.5V4"/><path d="M4 4l.8 9.5a.5.5 0 00.5.5h5.4a.5.5 0 00.5-.5L12 4"/><line x1="6.5" y1="7" x2="6.5" y2="11.5"/><line x1="9.5" y1="7" x2="9.5" y2="11.5"/></svg></button>
-            </div>
-          </div>
-        </div>
-        ${sess.exercises.map(ex=>{
-          const totalW=calcTotalWeight(ex.equip,ex.weightPer);
-          const tagClass=EQUIP_TAG_CLASS[ex.equip]||'tag-barbell';
-          const tagShort=EQUIP_TAG_SHORT[ex.equip]||'';
-          let detail='';
-          if(ex.equip==='bw'&&!ex.weightPer)detail=`${ex.sets} sets · Bodyweight · ${ex.reps} reps`;
-          else if(ex.equip==='2db')detail=`${ex.sets} sets · ${ex.weightPer} lb dumbbells (${totalW} lbs) · ${ex.reps} reps`;
-          else if(ex.equip==='1db')detail=`${ex.sets} sets · ${ex.weightPer} lb dumbbell · ${ex.reps} reps`;
-          else if(ex.equip==='kb')detail=`${ex.sets} sets · ${ex.weightPer} lb kettlebell · ${ex.reps} reps`;
-          else detail=`${ex.sets} sets · ${totalW} lbs · ${ex.reps} reps`;
-          return`<div class="divider"></div>
-          <div class="ex-row">
-            <div class="ex-info">
-              <div class="ex-name">${ex.name}<span class="equip-tag ${tagClass}">${tagShort}</span></div>
-              <div class="ex-detail">${detail}</div>
-            </div>
-            <div class="ex-btns">
-              <button class="icon-btn" onclick="openEditEx('${sess.id}','${ex.id}')" style="color:var(--text2)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3L11 2z"/></svg></button>
-              <button class="icon-btn icon-btn-red" onclick="confirmDeleteEx('${sess.id}','${ex.id}')" style="color:var(--orange)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="2,4 14,4"/><path d="M5 4V2.5a.5.5 0 01.5-.5h5a.5.5 0 01.5.5V4"/><path d="M4 4l.8 9.5a.5.5 0 00.5.5h5.4a.5.5 0 00.5-.5L12 4"/><line x1="6.5" y1="7" x2="6.5" y2="11.5"/><line x1="9.5" y1="7" x2="9.5" y2="11.5"/></svg></button>
-            </div>
-          </div>`;
-        }).join('')}
-        <button class="add-ex-btn" onclick="openAddEx('${sess.id}')">+ Add exercise</button>
-      </div>`;
+    const lbl=document.createElement('div');
+    lbl.className='slabel';lbl.textContent=fmtDate(date);c.appendChild(lbl);
+    groups[date].forEach(sess=>c.appendChild(buildSessCard(sess)));
+  });
+}
+
+function buildSessCard(sess){
+  const wasOpen=openSessions.has(sess.id);
+  const vol=sessVolume(sess);
+  const exCount=sess.exercises.length;
+  const todCls='tod-'+sess.tod.toLowerCase();
+  const accentCol=accentColor(sess.tod);
+
+  const card=document.createElement('div');
+  card.className='sess-card';
+  card.dataset.sid=sess.id;
+
+  // accent bar
+  const accent=document.createElement('div');
+  accent.className='sess-accent';accent.style.background=accentCol;card.appendChild(accent);
+
+  // clickable bar
+  const bar=document.createElement('div');
+  bar.className='sess-bar';
+  bar.innerHTML=`<div style="flex:1;min-width:0">
+    <div class="sess-title">${sess.label||sess.tod+' session'}</div>
+    <div class="sess-meta" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;align-items:center">
+      <span class="tod-pill ${todCls}">${sess.tod}</span>
+      <span class="sess-meta-item">⏱ ${sess.dur}</span>
+      ${exCount?`<span class="ex-count-badge">${exCount} exercise${exCount!==1?'s':''}</span>`:''}
+      ${vol>0?`<span class="sess-meta-item">${Math.round(vol).toLocaleString()} lbs</span>`:''}
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:10px">
+    <button class="icon-btn" style="color:var(--text2)" onclick="event.stopPropagation();openEditSession('${sess.id}')">${EDIT_SVG}</button>
+    <button class="icon-btn" style="color:var(--orange)" onclick="event.stopPropagation();confirmDeleteSession('${sess.id}')">${TRASH_SVG}</button>
+    ${CHEVRON_SVG}
+  </div>`;
+  card.appendChild(bar);
+
+  // expandable body
+  const body=document.createElement('div');
+  body.className='sess-body'+(wasOpen?' open':'');
+  card.appendChild(body);
+
+  // toggle on bar click
+  bar.addEventListener('click',()=>{
+    const isOpen=body.classList.contains('open');
+    body.classList.toggle('open',!isOpen);
+    const chev=bar.querySelector('.sess-chevron');
+    if(chev)chev.classList.toggle('open',!isOpen);
+    if(!isOpen)openSessions.add(sess.id);else openSessions.delete(sess.id);
+    if(!isOpen)rebuildBody(body,sess);
+  });
+
+  if(wasOpen){
+    const chev=bar.querySelector('.sess-chevron');
+    if(chev)chev.classList.add('open');
+    rebuildBody(body,sess);
+  }
+  return card;
+}
+
+function rebuildBody(body,sess){
+  body.innerHTML='';
+  sess.exercises.forEach((ex,ei)=>{
+    body.appendChild(buildExBlock(sess,ex,ei));
+  });
+  // add exercise btn
+  const addBtn=document.createElement('button');
+  addBtn.className='add-ex-btn';
+  addBtn.textContent='+ Add exercise';
+  addBtn.onclick=()=>openAddEx(sess.id);
+  body.appendChild(addBtn);
+  // save btn
+  const saveBtn=document.createElement('button');
+  saveBtn.className='sess-save-btn';
+  saveBtn.textContent='Save session';
+  saveBtn.onclick=()=>saveSessionInline(sess.id,body);
+  body.appendChild(saveBtn);
+  // init drag
+  initDrag(body,sess);
+}
+
+function buildExBlock(sess,ex,ei){
+  const tagClass=EQUIP_TAG_CLASS[ex.equip]||'tag-barbell';
+  const tagShort=EQUIP_TAG_SHORT[ex.equip]||'';
+  const block=document.createElement('div');
+  block.className='ex-block';
+  block.dataset.eid=ex.id;
+
+  // header row
+  const head=document.createElement('div');
+  head.className='ex-block-head';
+  head.innerHTML=`
+    <div class="drag-handle" title="Drag to reorder">${DRAG_SVG}</div>
+    <div class="ex-block-name">${ex.name}<span class="equip-tag ${tagClass}" style="margin-left:6px">${tagShort}</span></div>
+    <div style="display:flex;gap:4px;flex-shrink:0">
+      <button class="icon-btn" style="color:var(--text2)" onclick="openEditEx('${sess.id}','${ex.id}')">${EDIT_SVG}</button>
+      <button class="icon-btn" style="color:var(--orange)" onclick="confirmDeleteEx('${sess.id}','${ex.id}')">${TRASH_SVG}</button>
+    </div>`;
+  block.appendChild(head);
+
+  // set table
+  const isBW=ex.equip==='bw';
+  const is2db=ex.equip==='2db';
+  const wtLabel=isBW?'BW lbs':is2db?'Each (lbs)':'Weight';
+
+  // header row
+  const gh=document.createElement('div');
+  gh.className='set-grid set-grid-head';
+  gh.innerHTML=`<span></span><span>${wtLabel}</span><span>Reps</span><span></span>`;
+  block.appendChild(gh);
+
+  // ensure setLog array exists
+  if(!ex.setLog||ex.setLog.length!==ex.sets){
+    ex.setLog=Array.from({length:ex.sets},(_,i)=>(ex.setLog&&ex.setLog[i])?ex.setLog[i]:{w:isBW?'':String(ex.weightPer||''),r:String(ex.reps||''),done:false});
+  }
+
+  ex.setLog.forEach((sl,si)=>{
+    const row=document.createElement('div');
+    row.className='set-grid';
+    const checkClass='set-check'+(sl.done?' done':'');
+    const checkInner=sl.done?CHECK_SVG:'';
+    row.innerHTML=`
+      <span class="set-num-label">${si+1}</span>
+      <input class="set-input" type="number" min="0" placeholder="—" value="${sl.w||''}" data-si="${si}" data-field="w"/>
+      <input class="set-input" type="number" min="0" max="200" placeholder="—" value="${sl.r||''}" data-si="${si}" data-field="r"/>
+      <input class="set-input" type="number" min="0" max="200" placeholder="—" value="${sl.r||''}" data-si="${si}" data-field="r2"/>
+      <button class="${checkClass}" data-si="${si}">${checkInner}</button>`;
+    // fix: cols are set-num | sets | weight | reps | check — let me correct grid
+    row.innerHTML=`
+      <span class="set-num-label">${si+1}</span>
+      <input class="set-input" type="number" min="0" placeholder="—" value="${sl.w||''}" data-si="${si}" data-field="w"/>
+      <input class="set-input" type="number" min="1" max="200" placeholder="—" value="${sl.r||''}" data-si="${si}" data-field="r"/>
+      <button class="${checkClass}" data-si="${si}">${checkInner}</button>`;
+    block.appendChild(row);
+  });
+
+  // wire inputs and checks
+  block.querySelectorAll('.set-input').forEach(inp=>{
+    inp.addEventListener('change',()=>{
+      const si=parseInt(inp.dataset.si);
+      const field=inp.dataset.field;
+      ex.setLog[si][field]=inp.value;
     });
   });
-  c.innerHTML=html;
+  block.querySelectorAll('.set-check').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const si=parseInt(btn.dataset.si);
+      ex.setLog[si].done=!ex.setLog[si].done;
+      btn.classList.toggle('done',ex.setLog[si].done);
+      btn.innerHTML=ex.setLog[si].done?CHECK_SVG:'';
+    });
+  });
+
+  if(is2db){
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:11px;color:var(--text2);padding:0 16px 8px;';
+    hint.textContent='Enter weight per dumbbell — total will be ×2';
+    block.appendChild(hint);
+  }
+
+  return block;
+}
+
+function saveSessionInline(sessId,body){
+  const sess=sessions.find(s=>s.id===sessId);if(!sess)return;
+  // pull values from inputs
+  body.querySelectorAll('.ex-block').forEach(block=>{
+    const eid=block.dataset.eid;
+    const ex=sess.exercises.find(e=>e.id===eid);if(!ex)return;
+    const rows=block.querySelectorAll('.set-grid:not(.set-grid-head)');
+    rows.forEach((row,si)=>{
+      if(!ex.setLog[si])return;
+      const inputs=row.querySelectorAll('.set-input');
+      if(inputs[0])ex.setLog[si].w=inputs[0].value;
+      if(inputs[1])ex.setLog[si].r=inputs[1].value;
+    });
+    // update main fields from first set log
+    if(ex.setLog[0]){
+      if(ex.setLog[0].w)ex.weightPer=parseFloat(ex.setLog[0].w)||ex.weightPer;
+      if(ex.setLog[0].r)ex.reps=parseInt(ex.setLog[0].r)||ex.reps;
+    }
+  });
+  saveSessions();
+  toast('Session saved!');
+}
+
+/* DRAG TO REORDER */
+function initDrag(body,sess){
+  let dragging=null,dragOverEl=null;
+  body.querySelectorAll('.ex-block').forEach(block=>{
+    const handle=block.querySelector('.drag-handle');
+    if(!handle)return;
+    handle.addEventListener('touchstart',e=>{startDrag(e,block,body,sess);},{passive:true});
+    handle.addEventListener('mousedown',e=>{startDrag(e,block,body,sess);});
+  });
+}
+
+function startDrag(e,block,body,sess){
+  let dragging=block;
+  dragging.classList.add('dragging');
+  let startY=e.touches?e.touches[0].clientY:e.clientY;
+  let origIndex=[...body.querySelectorAll('.ex-block')].indexOf(dragging);
+
+  function onMove(ev){
+    const y=ev.touches?ev.touches[0].clientY:ev.clientY;
+    const blocks=[...body.querySelectorAll('.ex-block:not(.dragging)')];
+    let target=null;
+    blocks.forEach(b=>{
+      const rect=b.getBoundingClientRect();
+      if(y>rect.top&&y<rect.bottom)target=b;
+      b.classList.remove('drag-over');
+    });
+    if(target){target.classList.add('drag-over');}
+  }
+  function onEnd(ev){
+    dragging.classList.remove('dragging');
+    body.querySelectorAll('.ex-block').forEach(b=>b.classList.remove('drag-over'));
+    const y=ev.touches?ev.changedTouches[0].clientY:ev.clientY;
+    const blocks=[...body.querySelectorAll('.ex-block:not(.dragging)')];
+    let targetEl=null;
+    blocks.forEach(b=>{
+      const rect=b.getBoundingClientRect();
+      if(y>rect.top&&y<rect.bottom)targetEl=b;
+    });
+    if(targetEl){
+      const newIndex=[...body.querySelectorAll('.ex-block')].indexOf(targetEl);
+      const exArr=sess.exercises;
+      const moved=exArr.splice(origIndex,1)[0];
+      const insertAt=newIndex>origIndex?newIndex-1:newIndex;
+      exArr.splice(insertAt,0,moved);
+      saveSessions();
+      rebuildBody(body,sess);
+    }
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onEnd);
+    document.removeEventListener('touchmove',onMove);
+    document.removeEventListener('touchend',onEnd);
+  }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onEnd);
+  document.addEventListener('touchmove',onMove,{passive:true});
+  document.addEventListener('touchend',onEnd);
 }
 
 /* ── SESSION MODAL ── */
@@ -662,7 +892,11 @@ function saveExercise(){
     if(!fullLibrary().some(e=>e.n.toLowerCase()===name.toLowerCase())){customLibrary.push({n:name,c:'Custom',equip:currentEquip});saveCustomLib();}
     toast('Saved to library!');
   }
-  saveSessions();closeExModal();renderSessions();renderLib();renderProgress();
+  saveSessions();closeExModal();
+  // rebuild open session body if present
+  const openCard=document.querySelector(`.sess-card[data-sid="${pendingAddExSessionId||editExSessionId}"] .sess-body.open`);
+  if(openCard){const s=sessions.find(s=>s.id===(pendingAddExSessionId||editExSessionId));if(s)rebuildBody(openCard,s);}
+  renderSessions();renderLib();renderProgress();
 }
 
 /* ── LOCAL LIBRARY ── */
