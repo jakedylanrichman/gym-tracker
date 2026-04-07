@@ -514,7 +514,10 @@ const T={total:90000,remain:90000,running:false,iv:null,startAt:0,lapBase:90000,
 /* ── STORAGE ── */
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-function saveSessions(){lsSet('ft_sessions',sessions);}
+function saveSessions(){
+  lsSet('ft_sessions',sessions);
+  try{localStorage.setItem('ft_sessions_backup',JSON.stringify(sessions));}catch(e){}
+}
 function saveCustomLib(){lsSet('ft_custom_lib',customLibrary);}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function fullLibrary(){return[...BUILTIN_LIBRARY,...customLibrary];}
@@ -675,38 +678,67 @@ function buildExBlock(sess,ex,ei){
   block.className='ex-block';
   block.dataset.eid=ex.id;
 
+  /* ── COLLAPSED SUMMARY ── */
+  function getSummary(){
+    const done=ex.setLog.filter(sl=>sl.done).length;
+    const w=ex.setLog[0]&&ex.setLog[0].w||'—';
+    const r=ex.setLog[0]&&ex.setLog[0].r||'—';
+    const wStr=isBW?'BW':(is2db&&w!=='—'?w+' lbs each':w+' lbs');
+    return ex.sets+' sets · '+wStr+' · '+r+' reps'+(done>0?' · '+done+'/'+ex.sets+' done':'');
+  }
+
+  /* ── HEADER ROW (always visible) ── */
   const head=document.createElement('div');
   head.className='ex-block-head';
-  head.style.cursor='pointer';
-  head.style.userSelect='none';
 
+  // drag handle
+  const dragDiv=document.createElement('div');
+  dragDiv.className='drag-handle';
+  dragDiv.title='Drag to reorder';
+  dragDiv.innerHTML=DRAG_SVG;
+  dragDiv.addEventListener('click',function(e){e.stopPropagation();});
+  head.appendChild(dragDiv);
+
+  // name + summary
+  const nameWrap=document.createElement('div');
+  nameWrap.style.cssText='flex:1;min-width:0;cursor:pointer;';
+  const nameDiv=document.createElement('div');
+  nameDiv.className='ex-block-name';
+  nameDiv.innerHTML=ex.name+'<span class="equip-tag '+tagClass+'" style="margin-left:6px">'+tagShort+'</span>';
+  const summaryDiv=document.createElement('div');
+  summaryDiv.style.cssText='font-size:12px;color:var(--text2);margin-top:3px;';
+  summaryDiv.innerHTML=getSummary();
+  nameWrap.appendChild(nameDiv);
+  nameWrap.appendChild(summaryDiv);
+  head.appendChild(nameWrap);
+
+  // action buttons + chevron
+  const actions=document.createElement('div');
+  actions.style.cssText='display:flex;align-items:center;gap:4px;flex-shrink:0;';
+
+  const editBtn=document.createElement('button');
+  editBtn.className='icon-btn';
+  editBtn.style.color='var(--text2)';
+  editBtn.innerHTML=EDIT_SVG;
+  editBtn.addEventListener('click',function(e){e.stopPropagation();openEditEx(sess.id,ex.id);});
+  actions.appendChild(editBtn);
+
+  const delBtn=document.createElement('button');
+  delBtn.className='icon-btn';
+  delBtn.style.color='var(--orange)';
+  delBtn.innerHTML=TRASH_SVG;
+  delBtn.addEventListener('click',function(e){e.stopPropagation();confirmDeleteEx(sess.id,ex.id);});
+  actions.appendChild(delBtn);
+
+  const chev=document.createElement('span');
+  chev.className='sess-chevron';
+  chev.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><polyline points="4,6 8,10 12,6"/></svg>';
+  actions.appendChild(chev);
+  head.appendChild(actions);
+
+  /* ── SETS BODY (collapsible) ── */
   const setsBody=document.createElement('div');
   setsBody.style.display='none';
-
-  let setsOpen=false;
-
-  function getSummary(){
-    const doneCount=ex.setLog.filter(sl=>sl.done).length;
-    const firstW=ex.setLog[0]&&ex.setLog[0].w?ex.setLog[0].w:'—';
-    const firstR=ex.setLog[0]&&ex.setLog[0].r?ex.setLog[0].r:'—';
-    const wStr=isBW?'BW':(is2db&&firstW!=='—'?(firstW+' lbs each'):(firstW+' lbs'));
-    const doneStr=doneCount>0?' <span style="color:var(--green);font-weight:600">'+doneCount+'/'+ex.sets+' done</span>':'';
-    return ex.sets+' sets · '+wStr+' · '+firstR+' reps'+doneStr;
-  }
-
-  function refreshHead(){
-    head.innerHTML=
-      '<div class="drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">'+DRAG_SVG+'</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div class="ex-block-name">'+ex.name+'<span class="equip-tag '+tagClass+'" style="margin-left:6px">'+tagShort+'</span></div>'+
-        (!setsOpen?'<div style="font-size:12px;color:var(--text2);margin-top:3px">'+getSummary()+'</div>':'')+
-      '</div>'+
-      '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">'+
-        '<button class="icon-btn" style="color:var(--text2)" onclick="event.stopPropagation();openEditEx(''+sess.id+'',''+ex.id+'')">'+EDIT_SVG+'</button>'+
-        '<button class="icon-btn" style="color:var(--orange)" onclick="event.stopPropagation();confirmDeleteEx(''+sess.id+'',''+ex.id+'')">'+TRASH_SVG+'</button>'+
-        '<svg class="sess-chevron'+(setsOpen?' open':'')+'" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><polyline points="4,6 8,10 12,6"/></svg>'+
-      '</div>';
-  }
 
   function buildSets(){
     setsBody.innerHTML='';
@@ -718,11 +750,32 @@ function buildExBlock(sess,ex,ei){
     ex.setLog.forEach(function(sl,si){
       const row=document.createElement('div');
       row.className='set-grid';
-      row.innerHTML=
-        '<span class="set-num-label">'+(si+1)+'</span>'+
-        '<input class="set-input" type="number" min="0" placeholder="—" value="'+(sl.w||'')+'" data-si="'+si+'" data-field="w"/>'+
-        '<input class="set-input" type="number" min="1" max="200" placeholder="—" value="'+(sl.r||'')+'" data-si="'+si+'" data-field="r"/>'+
-        '<button class="set-check'+(sl.done?' done':'')+'" data-si="'+si+'">'+(sl.done?CHECK_SVG:'')+'</button>';
+
+      const numSpan=document.createElement('span');
+      numSpan.className='set-num-label';
+      numSpan.textContent=si+1;
+      row.appendChild(numSpan);
+
+      const wInput=document.createElement('input');
+      wInput.className='set-input';wInput.type='number';wInput.min='0';wInput.placeholder='—';wInput.value=sl.w||'';
+      wInput.addEventListener('change',function(){sl.w=wInput.value;summaryDiv.innerHTML=getSummary();});
+      row.appendChild(wInput);
+
+      const rInput=document.createElement('input');
+      rInput.className='set-input';rInput.type='number';rInput.min='1';rInput.max='200';rInput.placeholder='—';rInput.value=sl.r||'';
+      rInput.addEventListener('change',function(){sl.r=rInput.value;summaryDiv.innerHTML=getSummary();});
+      row.appendChild(rInput);
+
+      const checkBtn=document.createElement('button');
+      checkBtn.className='set-check'+(sl.done?' done':'');
+      checkBtn.innerHTML=sl.done?CHECK_SVG:'';
+      checkBtn.addEventListener('click',function(){
+        sl.done=!sl.done;
+        checkBtn.classList.toggle('done',sl.done);
+        checkBtn.innerHTML=sl.done?CHECK_SVG:'';
+        summaryDiv.innerHTML=getSummary();
+      });
+      row.appendChild(checkBtn);
       setsBody.appendChild(row);
     });
 
@@ -732,32 +785,20 @@ function buildExBlock(sess,ex,ei){
       hint.textContent='Enter weight per dumbbell — total will be x2';
       setsBody.appendChild(hint);
     }
-
-    setsBody.querySelectorAll('.set-input').forEach(function(inp){
-      inp.addEventListener('change',function(){
-        ex.setLog[parseInt(inp.dataset.si)][inp.dataset.field]=inp.value;
-        refreshHead();
-      });
-    });
-    setsBody.querySelectorAll('.set-check').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var si=parseInt(btn.dataset.si);
-        ex.setLog[si].done=!ex.setLog[si].done;
-        btn.classList.toggle('done',ex.setLog[si].done);
-        btn.innerHTML=ex.setLog[si].done?CHECK_SVG:'';
-        refreshHead();
-      });
-    });
   }
 
-  head.addEventListener('click',function(){
+  /* ── TOGGLE ── */
+  let setsOpen=false;
+  function toggleSets(e){
     setsOpen=!setsOpen;
     setsBody.style.display=setsOpen?'':'none';
+    chev.classList.toggle('open',setsOpen);
+    summaryDiv.style.display=setsOpen?'none':'';
     if(setsOpen)buildSets();
-    refreshHead();
-  });
+  }
+  nameWrap.addEventListener('click',toggleSets);
+  chev.addEventListener('click',function(e){e.stopPropagation();toggleSets();});
 
-  refreshHead();
   block.appendChild(head);
   block.appendChild(setsBody);
   return block;
@@ -1106,7 +1147,12 @@ function fireAlarm(){if(!document.getElementById('alarm-on').checked)return;try{
 
 /* ── INIT ── */
 (function(){
-  const s=lsGet('ft_sessions');if(s&&Array.isArray(s))sessions=s;
+  const s=lsGet('ft_sessions');
+  if(s&&Array.isArray(s)&&s.length>0){sessions=s;}
+  else{
+    // restore from backup if main is empty/missing
+    try{const b=JSON.parse(localStorage.getItem('ft_sessions_backup'));if(b&&Array.isArray(b)&&b.length>0){sessions=b;lsSet('ft_sessions',sessions);}}catch(e){}
+  }
   const l=lsGet('ft_custom_lib');if(l&&Array.isArray(l))customLibrary=l;
   renderSessions();renderLib();renderProgress();buildPresets();drawTimer(T.total);
 })();
