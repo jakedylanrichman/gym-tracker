@@ -217,6 +217,9 @@ select.finput{appearance:none;}
 
 .toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:14px;font-weight:600;padding:11px 22px;border-radius:50px;z-index:500;display:none;white-space:nowrap;}
 .card{background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);padding:16px;margin-bottom:12px;}
+.data-btn{display:inline-block;padding:11px 20px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;border:none;text-align:center;}
+.data-btn-orange{background:var(--orange);color:#fff;width:100%;}
+.data-btn-outline{display:block;padding:11px 20px;border-radius:50px;font-size:14px;font-weight:700;border:1.5px solid var(--border2);background:transparent;color:var(--text);text-align:center;width:100%;}
 /* COLLAPSIBLE SESSION */
 .sess-card{background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);margin-bottom:12px;overflow:hidden;transition:box-shadow .15s;}
 .sess-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none;-webkit-user-select:none;}
@@ -339,6 +342,22 @@ select.finput{appearance:none;}
     <div class="pr-card" id="pr-list"><div style="padding:20px;text-align:center;color:var(--text2);font-size:14px;">Save sessions to see PRs here.</div></div>
     <div class="slabel">Weekly volume</div>
     <div class="card" id="weekly-chart"><div style="color:var(--text2);font-size:14px;">Save sessions to see volume trend.</div></div>
+    <div class="slabel" style="margin-top:20px;">Data</div>
+    <div class="card" style="padding:0;">
+      <div style="padding:14px 16px;border-bottom:0.5px solid var(--border);">
+        <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Export your data</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Save all sessions and your library to a file. Use this to transfer data between Safari and the home screen app.</div>
+        <button class="data-btn data-btn-orange" onclick="exportData()">Export data</button>
+      </div>
+      <div style="padding:14px 16px;">
+        <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Import data</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Load a previously exported file. This will merge with your existing data.</div>
+        <label class="data-btn data-btn-outline" style="cursor:pointer;">
+          Import file
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)"/>
+        </label>
+      </div>
+    </div>
   </div>
 
   <nav class="bottom-nav">
@@ -1144,6 +1163,63 @@ function renderLaps(){if(!T.laps.length)return;document.getElementById('laps-wra
 function fmtMs(ms){const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000),h=Math.floor((ms%1000)/10);return`${m}:${s.toString().padStart(2,'0')}.${h.toString().padStart(2,'0')}`;}
 let audioCtx=null;
 function fireAlarm(){if(!document.getElementById('alarm-on').checked)return;try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();[0,0.45,0.9].forEach(o=>{const osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.connect(g);g.connect(audioCtx.destination);osc.frequency.value=880;osc.type='sine';g.gain.setValueAtTime(0.5,audioCtx.currentTime+o);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+o+0.38);osc.start(audioCtx.currentTime+o);osc.stop(audioCtx.currentTime+o+0.38);});}catch(e){}if(navigator.vibrate)navigator.vibrate([300,100,300,100,300]);toast('Time is up!','var(--red)');}
+
+/* ── EXPORT / IMPORT ── */
+function exportData(){
+  const data={
+    version:1,
+    exported:new Date().toISOString(),
+    sessions:sessions,
+    customLibrary:customLibrary
+  };
+  const json=JSON.stringify(data,null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='gym-tracker-backup-'+new Date().toISOString().split('T')[0]+'.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Data exported!');
+}
+
+function importData(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=JSON.parse(e.target.result);
+      let imported=0;
+      // merge sessions - add any sessions not already present by id
+      if(data.sessions&&Array.isArray(data.sessions)){
+        const existingIds=new Set(sessions.map(s=>s.id));
+        data.sessions.forEach(s=>{
+          if(!existingIds.has(s.id)){sessions.push(s);imported++;}
+        });
+        // sort by date descending
+        sessions.sort((a,b)=>b.date.localeCompare(a.date));
+      }
+      // merge custom library
+      if(data.customLibrary&&Array.isArray(data.customLibrary)){
+        const existingNames=new Set(customLibrary.map(e=>e.n.toLowerCase()));
+        data.customLibrary.forEach(e=>{
+          if(!existingNames.has(e.n.toLowerCase()))customLibrary.push(e);
+        });
+        saveCustomLib();
+      }
+      saveSessions();
+      renderSessions();renderLib();renderProgress();
+      toast('Imported '+imported+' session'+(imported!==1?'s':'')+'!');
+    }catch(err){
+      toast('Import failed — invalid file','var(--red)');
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
 
 /* ── INIT ── */
 (function(){
