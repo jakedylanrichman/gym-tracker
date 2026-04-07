@@ -701,6 +701,7 @@ function libQuickAdd(name,equip){
 function openDbBrowser(){
   document.getElementById('lib-local-view').style.display='none';
   document.getElementById('lib-db-view').style.display='';
+  document.getElementById('db-search-input').value='';
   buildDbFilters();
   dbFetch('');
 }
@@ -722,7 +723,7 @@ function buildDbFilters(){
 function setDbFilter(id){dbEquipFilter=id;buildDbFilters();dbFetch(document.getElementById('db-search-input').value.trim());}
 function setDbCat(c){dbCatFilter=c;buildDbFilters();dbFetch(document.getElementById('db-search-input').value.trim());}
 function setDbDiff(d){dbDiffFilter=d;buildDbFilters();dbFetch(document.getElementById('db-search-input').value.trim());}
-function dbSearchDebounced(){clearTimeout(dbSearchTimer);dbSearchTimer=setTimeout(()=>dbFetch(document.getElementById('db-search-input').value.trim()),380);}
+function dbSearchDebounced(){dbFetch(document.getElementById('db-search-input').value.trim());}
 
 function dbFetch(query){
   document.getElementById('db-load-more').style.display='none';
@@ -742,33 +743,27 @@ function dbFetch(query){
 function renderDbResults(reset){
   if(reset)dbShowing=0;
   const resultsEl=document.getElementById('db-results');
-  if(!dbAllResults.length){resultsEl.innerHTML='<div class="db-error">No exercises found. Try a different search or filter.</div>';document.getElementById('db-count').textContent='';document.getElementById('db-load-more').style.display='none';return;}
-  document.getElementById('db-count').textContent=`${dbAllResults.length} result${dbAllResults.length!==1?'s':''}`;
+  if(!dbAllResults.length){
+    resultsEl.innerHTML='<div class="db-error">No exercises found. Try a different search or filter.</div>';
+    document.getElementById('db-count').textContent='';
+    document.getElementById('db-load-more').style.display='none';
+    return;
+  }
+  document.getElementById('db-count').textContent=dbAllResults.length.toLocaleString()+' result'+(dbAllResults.length!==1?'s':'');
   const myNames=new Set(fullLibrary().map(e=>e.n.toLowerCase()));
   const slice=dbAllResults.slice(0,dbShowing+DB_PAGE);
   dbShowing=slice.length;
   if(reset)resultsEl.innerHTML='';
-  slice.slice(reset?0:dbShowing-DB_PAGE).forEach(ex=>{
-    const equipInfo=ex.equipment&&ex.equipment.length?WGER_EQUIP[ex.equipment[0]]:{label:'Bodyweight',key:'bw'};
-    const catLabel=ex.category?WGER_CAT[ex.category]||'Other':'Other';
-    const muscles=(ex.muscles||[]).map(m=>m.name_en||m.name||'').filter(Boolean).slice(0,3);
-    const inLib=myNames.has(ex.name.toLowerCase());
-    const safeId=`db-${ex.id||Math.random().toString(36).slice(2)}`;
-    const card=document.createElement('div');
+  slice.slice(reset?0:dbShowing-DB_PAGE).forEach(function(ex){
+    var equipLabel=EQUIP_LABELS[ex.equip]||ex.equip;
+    var inLib=myNames.has(ex.n.toLowerCase());
+    var safeName=ex.n.replace(/'/g,"\'").replace(/"/g,'&quot;');
+    var card=document.createElement('div');
     card.className='db-card';
-    card.innerHTML=`
-      <div class="db-card-head">
-        <div class="db-ex-name">${ex.name}</div>
-        <div class="db-tags">
-          <span class="db-tag db-tag-equip">${equipInfo.label}</span>
-          <span class="db-tag db-tag-cat">${catLabel}</span>
-        </div>
-      </div>
-      ${muscles.length?`<div class="db-muscles">${muscles.map(m=>`<span class="muscle-chip">${m}</span>`).join('')}</div>`:''}
-      ${inLib
-        ?`<div class="db-added">✓ Already in your library</div>`
-        :`<button class="db-add-btn" id="${safeId}" onclick="dbAddToLib(this,'${ex.name.replace(/'/g,"\\'")}','${equipInfo.key}','${catLabel}')">+ Add to my library</button>`
-      }`;
+    var addHtml=inLib
+      ?'<div class="db-added">\u2713 Already in your library</div>'
+      :'<button class="db-add-btn" onclick="dbAddToLib(this,\'' +safeName+ '\',\'' +ex.equip+ '\',\'' +ex.c+ '\')">+ Add to my library</button>';
+    card.innerHTML='<div class="db-card-head"><div class="db-ex-name">'+ex.n+'</div><div class="db-tags"><span class="db-tag db-tag-equip">'+equipLabel+'</span><span class="db-tag db-tag-cat">'+ex.c+'</span>'+(ex.d?'<span class="db-tag" style="background:var(--bg2);color:var(--text2)">'+ex.d+'</span>':'')+'</div></div>'+addHtml;
     resultsEl.appendChild(card);
   });
   document.getElementById('db-load-more').style.display=dbShowing<dbAllResults.length?'':'none';
