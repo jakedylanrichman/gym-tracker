@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="Gym Tracker"/>
+<meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no"/>
 <title>Gym Tracker</title>
 <style>
 :root{
@@ -290,9 +291,9 @@ select.finput{appearance:none;}
     <div class="slabel">Custom</div>
     <div class="card">
       <div class="custom-row">
-        <input class="tspin" type="number" id="cmin" min="0" max="99" value="1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+        <input class="tspin" type="number" id="cmin" min="0" max="99" value="1" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
         <span class="tsep">:</span>
-        <input class="tspin" type="number" id="csec" min="0" max="59" value="30" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+        <input class="tspin" type="number" id="csec" min="0" max="59" value="30" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
         <button class="tset-btn" onclick="applyCustom()">Set timer</button>
       </div>
       <div class="alarm-row">
@@ -315,7 +316,7 @@ select.finput{appearance:none;}
   <div class="page" id="page-library">
     <div id="lib-local-view">
       <button class="browse-db-btn" onclick="openDbBrowser()">🔍 Browse 3,240 exercises — works offline</button>
-      <input type="search" class="lib-search" id="lib-search" placeholder="Search my library..." oninput="renderLib()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="search" class="lib-search" id="lib-search" placeholder="Search my library..." oninput="renderLib()" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       <div class="cat-row" id="cat-row"></div>
       <div id="lib-list"></div>
     </div>
@@ -325,7 +326,7 @@ select.finput{appearance:none;}
       </div>
       <div class="db-search-wrap">
         <span style="font-size:16px;color:var(--text3)">🔍</span>
-        <input type="text" id="db-search-input" placeholder="Search exercises..." oninput="dbSearchDebounced()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+        <input type="text" id="db-search-input" placeholder="Search exercises..." oninput="dbSearchDebounced()" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       </div>
       <div class="db-filter-row" id="db-filter-row"></div>
       <div class="db-filter-row" id="db-cat-row"></div>
@@ -375,7 +376,7 @@ select.finput{appearance:none;}
   <div class="float-sheet">
     <div class="float-handle"></div>
     <div class="sheet-title" id="session-modal-title">New session</div>
-    <div class="field"><label>Date</label><input type="date" class="finput" id="sess-date" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/></div>
+    <div class="field"><label>Date</label><input type="date" class="finput" id="sess-date" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/></div>
     <div class="field-row2">
       <div class="field"><label>Time of day</label>
         <select class="finput" id="sess-tod">
@@ -395,7 +396,7 @@ select.finput{appearance:none;}
         </select>
       </div>
     </div>
-    <div class="field"><label>Label (optional)</label><input type="text" class="finput" id="sess-label" placeholder="e.g. Push day, Leg day..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/></div>
+    <div class="field"><label>Label (optional)</label><input type="text" class="finput" id="sess-label" placeholder="e.g. Push day, Leg day..." name="session-label" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/></div>
     <div class="sheet-btns">
       <button class="sbtn" onclick="closeSessionModal()">Cancel</button>
       <button class="sbtn sbtn-orange" onclick="saveSession()">Save session</button>
@@ -410,7 +411,7 @@ select.finput{appearance:none;}
     <div class="sheet-title" id="ex-modal-title">Add exercise</div>
     <div class="field">
       <label>Exercise name</label>
-      <input type="text" class="finput" id="ex-name-in" placeholder="e.g. Dumbbell curl" oninput="filterSug()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="text" class="finput" id="ex-name-in" placeholder="e.g. Dumbbell curl" name="exercise-search" oninput="filterSug()" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
     </div>
     <div id="sug-list" style="margin-bottom:8px;"></div>
     <div class="field">
@@ -432,13 +433,13 @@ select.finput{appearance:none;}
         </select>
       </div>
       <div class="field"><label>Reps</label>
-        <input type="number" class="finput" id="ex-reps-in" placeholder="8" min="1" max="100" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+        <input type="number" class="finput" id="ex-reps-in" placeholder="8" min="1" max="100" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       </div>
     </div>
     <div id="weight-section">
       <div class="field">
         <label id="weight-label">Weight (lbs)</label>
-        <input type="number" class="finput" id="ex-weight-in" placeholder="0" min="0" oninput="updateCalc()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+        <input type="number" class="finput" id="ex-weight-in" placeholder="0" min="0" oninput="updateCalc()" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
         <div class="weight-hint" id="weight-hint"></div>
       </div>
       <div class="calc-box" id="calc-box" style="display:none">
@@ -777,13 +778,13 @@ function buildExBlock(sess,ex,ei){
 
       const wInput=document.createElement('input');
       wInput.className='set-input';wInput.type='number';wInput.min='0';wInput.placeholder='—';wInput.value=sl.w||'';
-      wInput.setAttribute('autocomplete','off');wInput.setAttribute('autocorrect','off');wInput.setAttribute('autocapitalize','off');
+      wInput.setAttribute('autocomplete','new-password');wInput.setAttribute('autocorrect','off');wInput.setAttribute('autocapitalize','off');
       wInput.addEventListener('change',function(){sl.w=wInput.value;summaryDiv.innerHTML=getSummary();});
       row.appendChild(wInput);
 
       const rInput=document.createElement('input');
       rInput.className='set-input';rInput.type='number';rInput.min='1';rInput.max='200';rInput.placeholder='—';rInput.value=sl.r||'';
-      rInput.setAttribute('autocomplete','off');rInput.setAttribute('autocorrect','off');rInput.setAttribute('autocapitalize','off');
+      rInput.setAttribute('autocomplete','new-password');rInput.setAttribute('autocorrect','off');rInput.setAttribute('autocapitalize','off');
       rInput.addEventListener('change',function(){sl.r=rInput.value;summaryDiv.innerHTML=getSummary();});
       row.appendChild(rInput);
 
