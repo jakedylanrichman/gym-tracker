@@ -574,7 +574,19 @@ function switchTab(name){
 /* ── HELPERS ── */
 function accentColor(tod){return tod==='Morning'?'var(--orange)':tod==='Afternoon'?'var(--amber)':'var(--purple)';}
 function calcTotalWeight(equip,weightPer){return(equip==='2db')?(parseFloat(weightPer)||0)*2:(parseFloat(weightPer)||0);}
-function sessVolume(sess){return(sess.exercises||[]).reduce((a,ex)=>a+calcTotalWeight(ex.equip,ex.weightPer)*(parseInt(ex.reps)||0)*(parseInt(ex.sets)||0),0);}
+function sessVolume(sess){
+  return(sess.exercises||[]).reduce((a,ex)=>{
+    if(ex.loggingActive&&ex.setLog&&ex.setLog.length){
+      // sum each set individually using logged values
+      return a+ex.setLog.reduce((b,sl)=>{
+        const w=sl.w?parseFloat(sl.w):calcTotalWeight(ex.equip,ex.weightPer);
+        const r=sl.r?parseInt(sl.r):(parseInt(ex.reps)||0);
+        return b+w*r;
+      },0);
+    }
+    return a+calcTotalWeight(ex.equip,ex.weightPer)*(parseInt(ex.reps)||0)*(parseInt(ex.sets)||0);
+  },0);
+}
 
 /* ── SESSIONS ── */
 /* ── SVG ICON CONSTANTS ── */
@@ -690,24 +702,37 @@ function buildExBlock(sess,ex,ei){
   const is2db=ex.equip==='2db';
   const wtLabel=isBW?'BW lbs':is2db?'Each (lbs)':'Weight';
 
+  // ensure setLog exists
   if(!ex.setLog||ex.setLog.length!==ex.sets){
     ex.setLog=Array.from({length:ex.sets},(_,i)=>(ex.setLog&&ex.setLog[i])?ex.setLog[i]:{w:isBW?'':String(ex.weightPer||''),r:String(ex.reps||''),done:false});
+  }
+  // logging active if any set has been customised or marked done
+  if(ex.loggingActive===undefined){
+    ex.loggingActive=ex.setLog.some(sl=>sl.done||(sl.w&&sl.w!==String(ex.weightPer||''))||(sl.r&&sl.r!==String(ex.reps||'')));
   }
 
   const block=document.createElement('div');
   block.className='ex-block';
   block.dataset.eid=ex.id;
 
-  /* ── COLLAPSED SUMMARY ── */
-  function getSummary(){
-    const done=ex.setLog.filter(sl=>sl.done).length;
-    const w=ex.setLog[0]&&ex.setLog[0].w||'—';
-    const r=ex.setLog[0]&&ex.setLog[0].r||'—';
-    const wStr=isBW?'BW':(is2db&&w!=='—'?w+' lbs each':w+' lbs');
-    return ex.sets+' sets · '+wStr+' · '+r+' reps'+(done>0?' · '+done+'/'+ex.sets+' done':'');
+  /* ── DEFAULT SUMMARY (when logging off) ── */
+  function getDefaultSummary(){
+    const totalW=calcTotalWeight(ex.equip,ex.weightPer);
+    if(isBW&&!ex.weightPer)return ex.sets+' sets · Bodyweight · '+ex.reps+' reps';
+    if(is2db)return ex.sets+' sets · '+ex.weightPer+' lb dumbbells ('+totalW+' lbs) · '+ex.reps+' reps';
+    return ex.sets+' sets · '+totalW+' lbs · '+ex.reps+' reps';
   }
 
-  /* ── HEADER ROW (always visible) ── */
+  /* ── LOG SUMMARY (when logging on) ── */
+  function getLogSummary(){
+    const done=ex.setLog.filter(sl=>sl.done).length;
+    const w=ex.setLog[0]&&ex.setLog[0].w?ex.setLog[0].w:(ex.weightPer||'—');
+    const r=ex.setLog[0]&&ex.setLog[0].r?ex.setLog[0].r:(ex.reps||'—');
+    const wStr=isBW?'BW':(is2db&&w!=='—'?w+' lbs each':w+' lbs');
+    return ex.sets+' sets · '+wStr+' · '+r+' reps'+(done>0?' · <span style="color:var(--green);font-weight:600">'+done+'/'+ex.sets+' done</span>':'');
+  }
+
+  /* ── HEADER ── */
   const head=document.createElement('div');
   head.className='ex-block-head';
 
@@ -721,32 +746,44 @@ function buildExBlock(sess,ex,ei){
 
   // name + summary
   const nameWrap=document.createElement('div');
-  nameWrap.style.cssText='flex:1;min-width:0;cursor:pointer;';
+  nameWrap.style.cssText='flex:1;min-width:0;';
   const nameDiv=document.createElement('div');
   nameDiv.className='ex-block-name';
   nameDiv.innerHTML=ex.name+'<span class="equip-tag '+tagClass+'" style="margin-left:6px">'+tagShort+'</span>';
   const summaryDiv=document.createElement('div');
   summaryDiv.style.cssText='font-size:12px;color:var(--text2);margin-top:3px;';
-  summaryDiv.innerHTML=getSummary();
+  summaryDiv.innerHTML=ex.loggingActive?getLogSummary():getDefaultSummary();
   nameWrap.appendChild(nameDiv);
   nameWrap.appendChild(summaryDiv);
   head.appendChild(nameWrap);
 
-  // action buttons + chevron
+  // actions
   const actions=document.createElement('div');
   actions.style.cssText='display:flex;align-items:center;gap:4px;flex-shrink:0;';
 
+  // Log sets toggle pill
+  const logToggle=document.createElement('button');
+  logToggle.style.cssText='font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;';
+  function styleToggle(){
+    logToggle.textContent='Log sets';
+    if(ex.loggingActive){
+      logToggle.style.background='var(--orange)';
+      logToggle.style.color='#fff';
+    } else {
+      logToggle.style.background='var(--bg2)';
+      logToggle.style.color='var(--text2)';
+    }
+  }
+  styleToggle();
+  actions.appendChild(logToggle);
+
   const editBtn=document.createElement('button');
-  editBtn.className='icon-btn';
-  editBtn.style.color='var(--text2)';
-  editBtn.innerHTML=EDIT_SVG;
+  editBtn.className='icon-btn';editBtn.style.color='var(--text2)';editBtn.innerHTML=EDIT_SVG;
   editBtn.addEventListener('click',function(e){e.stopPropagation();openEditEx(sess.id,ex.id);});
   actions.appendChild(editBtn);
 
   const delBtn=document.createElement('button');
-  delBtn.className='icon-btn';
-  delBtn.style.color='var(--orange)';
-  delBtn.innerHTML=TRASH_SVG;
+  delBtn.className='icon-btn';delBtn.style.color='var(--orange)';delBtn.innerHTML=TRASH_SVG;
   delBtn.addEventListener('click',function(e){e.stopPropagation();confirmDeleteEx(sess.id,ex.id);});
   actions.appendChild(delBtn);
 
@@ -756,7 +793,7 @@ function buildExBlock(sess,ex,ei){
   actions.appendChild(chev);
   head.appendChild(actions);
 
-  /* ── SETS BODY (collapsible) ── */
+  /* ── SETS BODY ── */
   const setsBody=document.createElement('div');
   setsBody.style.display='none';
 
@@ -766,28 +803,24 @@ function buildExBlock(sess,ex,ei){
     gh.className='set-grid set-grid-head';
     gh.innerHTML='<span></span><span>'+wtLabel+'</span><span>Reps</span><span></span>';
     setsBody.appendChild(gh);
-
     ex.setLog.forEach(function(sl,si){
       const row=document.createElement('div');
       row.className='set-grid';
-
       const numSpan=document.createElement('span');
-      numSpan.className='set-num-label';
-      numSpan.textContent=si+1;
+      numSpan.className='set-num-label';numSpan.textContent=si+1;
       row.appendChild(numSpan);
-
       const wInput=document.createElement('input');
-      wInput.className='set-input';wInput.type='number';wInput.min='0';wInput.placeholder='—';wInput.value=sl.w||'';
+      wInput.className='set-input';wInput.type='number';wInput.min='0';wInput.placeholder='—';
+      wInput.value=sl.w||ex.weightPer||'';
       wInput.setAttribute('autocomplete','new-password');wInput.setAttribute('autocorrect','off');wInput.setAttribute('autocapitalize','off');
-      wInput.addEventListener('change',function(){sl.w=wInput.value;summaryDiv.innerHTML=getSummary();});
+      wInput.addEventListener('change',function(){sl.w=wInput.value;summaryDiv.innerHTML=getLogSummary();});
       row.appendChild(wInput);
-
       const rInput=document.createElement('input');
-      rInput.className='set-input';rInput.type='number';rInput.min='1';rInput.max='200';rInput.placeholder='—';rInput.value=sl.r||'';
+      rInput.className='set-input';rInput.type='number';rInput.min='1';rInput.max='200';rInput.placeholder='—';
+      rInput.value=sl.r||ex.reps||'';
       rInput.setAttribute('autocomplete','new-password');rInput.setAttribute('autocorrect','off');rInput.setAttribute('autocapitalize','off');
-      rInput.addEventListener('change',function(){sl.r=rInput.value;summaryDiv.innerHTML=getSummary();});
+      rInput.addEventListener('change',function(){sl.r=rInput.value;summaryDiv.innerHTML=getLogSummary();});
       row.appendChild(rInput);
-
       const checkBtn=document.createElement('button');
       checkBtn.className='set-check'+(sl.done?' done':'');
       checkBtn.innerHTML=sl.done?CHECK_SVG:'';
@@ -795,12 +828,11 @@ function buildExBlock(sess,ex,ei){
         sl.done=!sl.done;
         checkBtn.classList.toggle('done',sl.done);
         checkBtn.innerHTML=sl.done?CHECK_SVG:'';
-        summaryDiv.innerHTML=getSummary();
+        summaryDiv.innerHTML=getLogSummary();
       });
       row.appendChild(checkBtn);
       setsBody.appendChild(row);
     });
-
     if(is2db){
       const hint=document.createElement('div');
       hint.style.cssText='font-size:11px;color:var(--text2);padding:2px 16px 10px;';
@@ -809,17 +841,52 @@ function buildExBlock(sess,ex,ei){
     }
   }
 
-  /* ── TOGGLE ── */
+  /* ── TOGGLE LOGGING ── */
   let setsOpen=false;
-  function toggleSets(e){
-    setsOpen=!setsOpen;
-    setsBody.style.display=setsOpen?'':'none';
-    chev.classList.toggle('open',setsOpen);
-    summaryDiv.style.display=setsOpen?'none':'';
-    if(setsOpen)buildSets();
+  function openSets(){
+    setsOpen=true;
+    setsBody.style.display='';
+    chev.classList.add('open');
+    buildSets();
   }
-  nameWrap.addEventListener('click',toggleSets);
-  chev.addEventListener('click',function(e){e.stopPropagation();toggleSets();});
+  function closeSets(){
+    setsOpen=false;
+    setsBody.style.display='none';
+    chev.classList.remove('open');
+  }
+
+  logToggle.addEventListener('click',function(e){
+    e.stopPropagation();
+    ex.loggingActive=!ex.loggingActive;
+    styleToggle();
+    if(ex.loggingActive){
+      openSets();
+      summaryDiv.innerHTML=getLogSummary();
+    } else {
+      closeSets();
+      summaryDiv.innerHTML=getDefaultSummary();
+    }
+  });
+
+  // tap name area to expand/collapse sets IF logging active
+  nameWrap.style.cursor='pointer';
+  nameWrap.addEventListener('click',function(){
+    if(!ex.loggingActive)return;
+    if(setsOpen)closeSets();else openSets();
+  });
+  chev.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(!ex.loggingActive)return;
+    if(setsOpen)closeSets();else openSets();
+  });
+
+  // if logging was already active, auto-open sets
+  if(ex.loggingActive){
+    setsBody.style.display='';
+    chev.classList.add('open');
+    // build after appending to DOM
+    setTimeout(function(){buildSets();},0);
+  }
 
   block.appendChild(head);
   block.appendChild(setsBody);
@@ -828,21 +895,8 @@ function buildExBlock(sess,ex,ei){
 
 function saveSessionInline(sessId,body){
   const sess=sessions.find(s=>s.id===sessId);if(!sess)return;
-  body.querySelectorAll('.ex-block').forEach(block=>{
-    const eid=block.dataset.eid;
-    const ex=sess.exercises.find(e=>e.id===eid);if(!ex)return;
-    const rows=block.querySelectorAll('.set-grid:not(.set-grid-head)');
-    rows.forEach((row,si)=>{
-      if(!ex.setLog[si])return;
-      const inputs=row.querySelectorAll('.set-input');
-      if(inputs[0])ex.setLog[si].w=inputs[0].value;
-      if(inputs[1])ex.setLog[si].r=inputs[1].value;
-    });
-    if(ex.setLog[0]){
-      if(ex.setLog[0].w)ex.weightPer=parseFloat(ex.setLog[0].w)||ex.weightPer;
-      if(ex.setLog[0].r)ex.reps=parseInt(ex.setLog[0].r)||ex.reps;
-    }
-  });
+  // values are already wired via change events in buildSets
+  // just need to sync loggingActive state and save
   saveSessions();
   renderSessions();
   renderProgress();
