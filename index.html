@@ -646,7 +646,7 @@ function rebuildBody(body,sess){
   // save btn
   const saveBtn=document.createElement('button');
   saveBtn.className='sess-save-btn';
-  saveBtn.textContent='Save session';
+  saveBtn.textContent='Save workout';
   saveBtn.onclick=()=>saveSessionInline(sess.id,body);
   body.appendChild(saveBtn);
   // init drag
@@ -737,7 +737,6 @@ function buildExBlock(sess,ex,ei){
 
 function saveSessionInline(sessId,body){
   const sess=sessions.find(s=>s.id===sessId);if(!sess)return;
-  // pull values from inputs
   body.querySelectorAll('.ex-block').forEach(block=>{
     const eid=block.dataset.eid;
     const ex=sess.exercises.find(e=>e.id===eid);if(!ex)return;
@@ -748,14 +747,15 @@ function saveSessionInline(sessId,body){
       if(inputs[0])ex.setLog[si].w=inputs[0].value;
       if(inputs[1])ex.setLog[si].r=inputs[1].value;
     });
-    // update main fields from first set log
     if(ex.setLog[0]){
       if(ex.setLog[0].w)ex.weightPer=parseFloat(ex.setLog[0].w)||ex.weightPer;
       if(ex.setLog[0].r)ex.reps=parseInt(ex.setLog[0].r)||ex.reps;
     }
   });
   saveSessions();
-  toast('Session saved!');
+  renderSessions();
+  renderProgress();
+  toast('Workout saved!');
 }
 
 /* DRAG TO REORDER */
@@ -826,7 +826,9 @@ function saveSession(){
   const dur=document.getElementById('sess-dur').value;
   const label=document.getElementById('sess-label').value.trim();
   if(editSessionId){const s=sessions.find(s=>s.id===editSessionId);if(s){s.date=date;s.tod=tod;s.dur=dur;s.label=label;}}
-  else sessions.unshift({id:uid(),date,tod,dur,label,exercises:[]});
+  let newId=null;
+  if(editSessionId){const s=sessions.find(s=>s.id===editSessionId);if(s){s.date=date;s.tod=tod;s.dur=dur;s.label=label;}}
+  else{newId=uid();sessions.unshift({id:newId,date,tod,dur,label,exercises:[]});openSessions.add(newId);}
   saveSessions();closeSessionModal();renderSessions();renderProgress();
   toast(editSessionId?'Session updated!':'Session created!');
 }
@@ -861,6 +863,7 @@ function filterSug(){
   });
 }
 function openAddEx(sessId){
+  openSessions.add(sessId);
   pendingAddExSessionId=sessId;editExSessionId=null;editExId=null;
   document.getElementById('ex-modal-title').textContent='Add exercise';
   document.getElementById('ex-name-in').value='';document.getElementById('sug-list').innerHTML='';
@@ -870,6 +873,7 @@ function openAddEx(sessId){
   setTimeout(()=>document.getElementById('ex-name-in').focus(),120);
 }
 function openEditEx(sessId,exId){
+  openSessions.add(sessId);
   const sess=sessions.find(s=>s.id===sessId);if(!sess)return;
   const ex=sess.exercises.find(e=>e.id===exId);if(!ex)return;
   editExSessionId=sessId;editExId=exId;pendingAddExSessionId=null;
@@ -1024,7 +1028,7 @@ function confirmDeleteEx(sessId,exId){
   const sess=sessions.find(s=>s.id===sessId);const ex=sess&&sess.exercises.find(e=>e.id===exId);if(!ex)return;
   document.getElementById('confirm-title').textContent='Remove exercise?';
   document.getElementById('confirm-msg').textContent=`Remove "${ex.name}" from this session?`;
-  document.getElementById('confirm-ok').onclick=()=>{sess.exercises=sess.exercises.filter(e=>e.id!==exId);saveSessions();renderSessions();renderProgress();closeConfirm();toast('Exercise removed','var(--red)');};
+  document.getElementById('confirm-ok').onclick=()=>{openSessions.add(sessId);sess.exercises=sess.exercises.filter(e=>e.id!==exId);saveSessions();renderSessions();renderProgress();closeConfirm();toast('Exercise removed','var(--red)');};
   document.getElementById('confirm-overlay').classList.add('open');
 }
 function closeConfirm(){document.getElementById('confirm-overlay').classList.remove('open');}
