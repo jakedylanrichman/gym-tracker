@@ -663,82 +663,103 @@ function rebuildBody(body,sess){
 function buildExBlock(sess,ex,ei){
   const tagClass=EQUIP_TAG_CLASS[ex.equip]||'tag-barbell';
   const tagShort=EQUIP_TAG_SHORT[ex.equip]||'';
-  const block=document.createElement('div');
-  block.className='ex-block';
-  block.dataset.eid=ex.id;
-
-  // header row
-  const head=document.createElement('div');
-  head.className='ex-block-head';
-  head.innerHTML=`
-    <div class="drag-handle" title="Drag to reorder">${DRAG_SVG}</div>
-    <div class="ex-block-name">${ex.name}<span class="equip-tag ${tagClass}" style="margin-left:6px">${tagShort}</span></div>
-    <div style="display:flex;gap:4px;flex-shrink:0">
-      <button class="icon-btn" style="color:var(--text2)" onclick="openEditEx('${sess.id}','${ex.id}')">${EDIT_SVG}</button>
-      <button class="icon-btn" style="color:var(--orange)" onclick="confirmDeleteEx('${sess.id}','${ex.id}')">${TRASH_SVG}</button>
-    </div>`;
-  block.appendChild(head);
-
-  // set table
   const isBW=ex.equip==='bw';
   const is2db=ex.equip==='2db';
   const wtLabel=isBW?'BW lbs':is2db?'Each (lbs)':'Weight';
 
-  // header row
-  const gh=document.createElement('div');
-  gh.className='set-grid set-grid-head';
-  gh.innerHTML=`<span></span><span>${wtLabel}</span><span>Reps</span><span></span>`;
-  block.appendChild(gh);
-
-  // ensure setLog array exists
   if(!ex.setLog||ex.setLog.length!==ex.sets){
     ex.setLog=Array.from({length:ex.sets},(_,i)=>(ex.setLog&&ex.setLog[i])?ex.setLog[i]:{w:isBW?'':String(ex.weightPer||''),r:String(ex.reps||''),done:false});
   }
 
-  ex.setLog.forEach((sl,si)=>{
-    const row=document.createElement('div');
-    row.className='set-grid';
-    const checkClass='set-check'+(sl.done?' done':'');
-    const checkInner=sl.done?CHECK_SVG:'';
-    row.innerHTML=`
-      <span class="set-num-label">${si+1}</span>
-      <input class="set-input" type="number" min="0" placeholder="—" value="${sl.w||''}" data-si="${si}" data-field="w"/>
-      <input class="set-input" type="number" min="0" max="200" placeholder="—" value="${sl.r||''}" data-si="${si}" data-field="r"/>
-      <input class="set-input" type="number" min="0" max="200" placeholder="—" value="${sl.r||''}" data-si="${si}" data-field="r2"/>
-      <button class="${checkClass}" data-si="${si}">${checkInner}</button>`;
-    // fix: cols are set-num | sets | weight | reps | check — let me correct grid
-    row.innerHTML=`
-      <span class="set-num-label">${si+1}</span>
-      <input class="set-input" type="number" min="0" placeholder="—" value="${sl.w||''}" data-si="${si}" data-field="w"/>
-      <input class="set-input" type="number" min="1" max="200" placeholder="—" value="${sl.r||''}" data-si="${si}" data-field="r"/>
-      <button class="${checkClass}" data-si="${si}">${checkInner}</button>`;
-    block.appendChild(row);
-  });
+  const block=document.createElement('div');
+  block.className='ex-block';
+  block.dataset.eid=ex.id;
 
-  // wire inputs and checks
-  block.querySelectorAll('.set-input').forEach(inp=>{
-    inp.addEventListener('change',()=>{
-      const si=parseInt(inp.dataset.si);
-      const field=inp.dataset.field;
-      ex.setLog[si][field]=inp.value;
-    });
-  });
-  block.querySelectorAll('.set-check').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const si=parseInt(btn.dataset.si);
-      ex.setLog[si].done=!ex.setLog[si].done;
-      btn.classList.toggle('done',ex.setLog[si].done);
-      btn.innerHTML=ex.setLog[si].done?CHECK_SVG:'';
-    });
-  });
+  const head=document.createElement('div');
+  head.className='ex-block-head';
+  head.style.cursor='pointer';
+  head.style.userSelect='none';
 
-  if(is2db){
-    const hint=document.createElement('div');
-    hint.style.cssText='font-size:11px;color:var(--text2);padding:0 16px 8px;';
-    hint.textContent='Enter weight per dumbbell — total will be ×2';
-    block.appendChild(hint);
+  const setsBody=document.createElement('div');
+  setsBody.style.display='none';
+
+  let setsOpen=false;
+
+  function getSummary(){
+    const doneCount=ex.setLog.filter(sl=>sl.done).length;
+    const firstW=ex.setLog[0]&&ex.setLog[0].w?ex.setLog[0].w:'—';
+    const firstR=ex.setLog[0]&&ex.setLog[0].r?ex.setLog[0].r:'—';
+    const wStr=isBW?'BW':(is2db&&firstW!=='—'?(firstW+' lbs each'):(firstW+' lbs'));
+    const doneStr=doneCount>0?' <span style="color:var(--green);font-weight:600">'+doneCount+'/'+ex.sets+' done</span>':'';
+    return ex.sets+' sets · '+wStr+' · '+firstR+' reps'+doneStr;
   }
 
+  function refreshHead(){
+    head.innerHTML=
+      '<div class="drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">'+DRAG_SVG+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div class="ex-block-name">'+ex.name+'<span class="equip-tag '+tagClass+'" style="margin-left:6px">'+tagShort+'</span></div>'+
+        (!setsOpen?'<div style="font-size:12px;color:var(--text2);margin-top:3px">'+getSummary()+'</div>':'')+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">'+
+        '<button class="icon-btn" style="color:var(--text2)" onclick="event.stopPropagation();openEditEx(''+sess.id+'',''+ex.id+'')">'+EDIT_SVG+'</button>'+
+        '<button class="icon-btn" style="color:var(--orange)" onclick="event.stopPropagation();confirmDeleteEx(''+sess.id+'',''+ex.id+'')">'+TRASH_SVG+'</button>'+
+        '<svg class="sess-chevron'+(setsOpen?' open':'')+'" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><polyline points="4,6 8,10 12,6"/></svg>'+
+      '</div>';
+  }
+
+  function buildSets(){
+    setsBody.innerHTML='';
+    const gh=document.createElement('div');
+    gh.className='set-grid set-grid-head';
+    gh.innerHTML='<span></span><span>'+wtLabel+'</span><span>Reps</span><span></span>';
+    setsBody.appendChild(gh);
+
+    ex.setLog.forEach(function(sl,si){
+      const row=document.createElement('div');
+      row.className='set-grid';
+      row.innerHTML=
+        '<span class="set-num-label">'+(si+1)+'</span>'+
+        '<input class="set-input" type="number" min="0" placeholder="—" value="'+(sl.w||'')+'" data-si="'+si+'" data-field="w"/>'+
+        '<input class="set-input" type="number" min="1" max="200" placeholder="—" value="'+(sl.r||'')+'" data-si="'+si+'" data-field="r"/>'+
+        '<button class="set-check'+(sl.done?' done':'')+'" data-si="'+si+'">'+(sl.done?CHECK_SVG:'')+'</button>';
+      setsBody.appendChild(row);
+    });
+
+    if(is2db){
+      const hint=document.createElement('div');
+      hint.style.cssText='font-size:11px;color:var(--text2);padding:2px 16px 10px;';
+      hint.textContent='Enter weight per dumbbell — total will be x2';
+      setsBody.appendChild(hint);
+    }
+
+    setsBody.querySelectorAll('.set-input').forEach(function(inp){
+      inp.addEventListener('change',function(){
+        ex.setLog[parseInt(inp.dataset.si)][inp.dataset.field]=inp.value;
+        refreshHead();
+      });
+    });
+    setsBody.querySelectorAll('.set-check').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var si=parseInt(btn.dataset.si);
+        ex.setLog[si].done=!ex.setLog[si].done;
+        btn.classList.toggle('done',ex.setLog[si].done);
+        btn.innerHTML=ex.setLog[si].done?CHECK_SVG:'';
+        refreshHead();
+      });
+    });
+  }
+
+  head.addEventListener('click',function(){
+    setsOpen=!setsOpen;
+    setsBody.style.display=setsOpen?'':'none';
+    if(setsOpen)buildSets();
+    refreshHead();
+  });
+
+  refreshHead();
+  block.appendChild(head);
+  block.appendChild(setsBody);
   return block;
 }
 
