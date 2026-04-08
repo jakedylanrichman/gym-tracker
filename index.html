@@ -757,7 +757,7 @@ function buildExBlock(sess,ex,ei){
 
   // ensure setLog exists
   if(!ex.setLog||ex.setLog.length!==ex.sets){
-    ex.setLog=Array.from({length:ex.sets},(_,i)=>(ex.setLog&&ex.setLog[i])?ex.setLog[i]:{w:isBW?'':String(ex.weightPer||''),r:String(ex.reps||''),done:false});
+    ex.setLog=Array.from({length:ex.sets},(_,i)=>(ex.setLog&&ex.setLog[i])?ex.setLog[i]:{w:isBW?'':String(ex.weightPer||''),r:'',done:false});
   }
   // logging active if any set has been customised or marked done
   if(ex.loggingActive===undefined){
@@ -870,7 +870,7 @@ function buildExBlock(sess,ex,ei){
       row.appendChild(wInput);
       const rInput=document.createElement('input');
       rInput.className='set-input';rInput.type='number';rInput.min='1';rInput.max='200';rInput.placeholder='—';
-      rInput.value=sl.r||ex.reps||'';
+      rInput.value=sl.r||'';
       rInput.setAttribute('autocomplete','new-password');rInput.setAttribute('autocorrect','off');rInput.setAttribute('autocapitalize','off');
       rInput.addEventListener('change',function(){sl.r=rInput.value;summaryDiv.innerHTML=getLogSummary();});
       row.appendChild(rInput);
@@ -933,14 +933,7 @@ function buildExBlock(sess,ex,ei){
     if(setsOpen)closeSets();else openSets();
   });
 
-  // if logging was already active, auto-open sets
-  if(ex.loggingActive){
-    setsBody.style.display='';
-    chev.classList.add('open');
-    // build after appending to DOM
-    setTimeout(function(){buildSets();},0);
-  }
-
+  // do NOT auto-open — user controls expand/collapse
   block.appendChild(head);
   block.appendChild(setsBody);
   return block;
@@ -1056,10 +1049,16 @@ function updateWeightUI(){
   updateCalc();
 }
 function updateCalc(){if(currentEquip!=='2db')return;document.getElementById('calc-val').textContent=((parseFloat(document.getElementById('ex-weight-in').value)||0)*2)+' lbs';}
+function matchesSearch(name,query){
+  if(!query)return true;
+  const words=query.toLowerCase().split(/\s+/).filter(Boolean);
+  const n=name.toLowerCase();
+  return words.every(w=>n.includes(w));
+}
 function filterSug(){
   const q=document.getElementById('ex-name-in').value.toLowerCase().trim();
   const box=document.getElementById('sug-list');box.innerHTML='';if(!q)return;
-  fullLibrary().filter(e=>e.n.toLowerCase().includes(q)).slice(0,6).forEach(e=>{
+  fullLibrary().filter(e=>matchesSearch(e.n,q)).slice(0,6).forEach(e=>{
     const d=document.createElement('div');d.className='sug-item';
     d.innerHTML=`<span>${e.n}</span><span class="equip-tag ${EQUIP_TAG_CLASS[e.equip]||''}">${EQUIP_TAG_SHORT[e.equip]||''}</span>`;
     d.onclick=()=>{document.getElementById('ex-name-in').value=e.n;setEquip(e.equip||'barbell');box.innerHTML='';};
@@ -1111,7 +1110,7 @@ function saveExercise(){
 function renderLib(){
   const q=document.getElementById('lib-search').value.toLowerCase();
   document.getElementById('cat-row').innerHTML=CATS.map(c=>`<button class="cat-btn${libCat===c?' active':''}" onclick="setLibCat('${c}')">${c}</button>`).join('');
-  const filtered=fullLibrary().filter(e=>(libCat==='All'||e.c===libCat)&&(!q||e.n.toLowerCase().includes(q)));
+  const filtered=fullLibrary().filter(e=>(libCat==='All'||e.c===libCat)&&matchesSearch(e.n,q));
   if(!filtered.length){document.getElementById('lib-list').innerHTML='<div class="lib-list"><div style="padding:20px;text-align:center;color:var(--text2);font-size:14px">No exercises found</div></div>';return;}
   const equipOrder=['barbell','2db','1db','kb','bw','machine','cable'];
   const groups={};
@@ -1172,7 +1171,7 @@ function dbFetch(query){
   document.getElementById('db-count').textContent='';
   const q=(query||'').toLowerCase().trim();
   dbAllResults=DB_EXERCISES.filter(e=>{
-    const matchQ=!q||e.n.toLowerCase().includes(q);
+    const matchQ=matchesSearch(e.n,q);
     const matchEquip=dbEquipFilter==='all'||e.equip===dbEquipFilter;
     const matchCat=dbCatFilter==='All'||e.c===dbCatFilter;
     const matchDiff=dbDiffFilter==='all'||e.d===dbDiffFilter;
