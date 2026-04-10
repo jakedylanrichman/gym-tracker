@@ -721,7 +721,7 @@ async function authSubmit(){
   btn.innerHTML='<span class="auth-spinner"></span>'+(_authMode==='signup'?'Creating account...':'Signing in...');
   errEl.style.display='none';
   const{data,error}=_authMode==='signup'
-    ?await _sb.auth.signUp({email,password})
+    ?await _sb.auth.signUp({email,password,options:{emailRedirectTo:'https://jakedylanrichman.github.io/gym-tracker'}})
     :await _sb.auth.signInWithPassword({email,password});
   btn.disabled=false;
   btn.textContent=_authMode==='signup'?'Create account':'Sign in';
