@@ -646,6 +646,16 @@ const DB_EXERCISES=[{"n":"Stability Ball Dead Bug","c":"Core","equip":"machine",
 /* ── CONSTANTS ── */
 /* BUILTIN_LIBRARY removed — using DB_EXERCISES directly */
 
+const PRIORITY_EXERCISES=new Set([
+  'bench press','incline bench','dumbbell press','incline dumbbell press','dumbbell fly','chest dip','push-up',
+  'overhead press','lateral raise','arnold press','front raise','face pull',
+  'deadlift','barbell row','dumbbell row','pull-up','chin-up','lat pulldown','seated row','t-bar row',
+  'squat','romanian deadlift','leg press','leg curl','leg extension','lunge','bulgarian split squat','calf raise',
+  'barbell curl','dumbbell curl','hammer curl','tricep pushdown','skull crusher','tricep dip','close-grip bench press',
+  'plank','crunch','leg raise','russian twist','ab wheel rollout',
+  'kettlebell swing','kettlebell goblet squat','kettlebell press','kettlebell snatch',
+  'cable fly','cable row','cable curl','tricep pushdown'
+]);
 const EQUIP_LABELS={barbell:'Barbell','2db':'2 Dumbbells','1db':'1 Dumbbell',kb:'Kettlebell',bw:'Bodyweight',machine:'Machine',cable:'Cable'};
 const EQUIP_TAG_CLASS={barbell:'tag-barbell','2db':'tag-2db','1db':'tag-1db',kb:'tag-kb',bw:'tag-bw',machine:'tag-machine',cable:'tag-cable'};
 const EQUIP_TAG_SHORT={barbell:'BB','2db':'2 DB','1db':'1 DB',kb:'KB',bw:'BW',machine:'MCH',cable:'CBL'};
@@ -1338,10 +1348,13 @@ function setEquipFromLib(equip,name){
 function filterSug(){
   const q=document.getElementById('ex-name-in').value.trim();
   const box=document.getElementById('sug-list');box.innerHTML='';
-  // if user changed text after a lib pick, restore the selector
   if(equipFromLib&&q.toLowerCase()!==equipFromLibName.toLowerCase())resetEquipModal();
   if(!q)return;
-  fullLibrary().filter(e=>matchesSearch(e.n,q.toLowerCase())).forEach(e=>{
+  const ql=q.toLowerCase();
+  const matches=fullLibrary().filter(e=>matchesSearch(e.n,ql));
+  const tier1=matches.filter(e=>PRIORITY_EXERCISES.has(e.n.toLowerCase())).sort((a,b)=>a.n.length-b.n.length);
+  const tier2=matches.filter(e=>!PRIORITY_EXERCISES.has(e.n.toLowerCase())).sort((a,b)=>a.n.length-b.n.length);
+  [...tier1,...tier2].forEach(e=>{
     const d=document.createElement('div');d.className='sug-item';
     d.innerHTML=`<span>${e.n}</span><span class="equip-tag ${EQUIP_TAG_CLASS[e.equip]||''}">${EQUIP_TAG_SHORT[e.equip]||''}</span>`;
     d.onclick=()=>{document.getElementById('ex-name-in').value=e.n;setEquipFromLib(e.equip||'barbell',e.n);box.innerHTML='';};
@@ -1395,20 +1408,24 @@ function renderLib(){
   document.getElementById('cat-row').innerHTML=CATS.map(c=>`<button class="cat-btn${libCat===c?' active':''}" onclick="setLibCat('${c}')">${c}</button>`).join('');
   const filtered=fullLibrary().filter(e=>(libCat==='All'||e.c===libCat)&&matchesSearch(e.n,q));
   if(!filtered.length){document.getElementById('lib-list').innerHTML='<div class="lib-list"><div style="padding:20px;text-align:center;color:var(--text2);font-size:14px">No exercises found</div></div>';return;}
+  function libRow(e){const isCustom=customLibrary.some(c=>c.n===e.n);return`<div class="lib-row" onclick="libQuickAdd('${e.n.replace(/'/g,"\\'")}','${e.equip}')"><div><div class="lib-name">${e.n}<span class="equip-tag ${EQUIP_TAG_CLASS[e.equip]||''}" style="margin-left:6px">${EQUIP_TAG_SHORT[e.equip]||''}</span>${isCustom?'<span class="equip-tag tag-bw" style="margin-left:4px">My</span>':''}</div><div class="lib-cat">${e.c}</div></div><span class="lib-plus">+</span></div>`;}
+  let html='<div class="lib-list">';
+  // Popular section: only when All category, no search query
+  if(libCat==='All'&&!q){
+    const popular=filtered.filter(e=>PRIORITY_EXERCISES.has(e.n.toLowerCase())).slice(0,20);
+    if(popular.length){
+      html+=`<div class="lib-section-header">Popular</div>`;
+      popular.forEach(e=>{html+=libRow(e);});
+    }
+  }
+  // Equipment-grouped sections
   const equipOrder=['barbell','2db','1db','kb','bw','machine','cable'];
   const groups={};
   filtered.forEach(e=>{const k=e.equip||'barbell';(groups[k]=groups[k]||[]).push(e);});
-  let html='<div class="lib-list">';
   equipOrder.forEach(eq=>{
     if(!groups[eq])return;
     html+=`<div class="lib-section-header">${EQUIP_LABELS[eq]}</div>`;
-    groups[eq].forEach(e=>{
-      const isCustom=customLibrary.some(c=>c.n===e.n);
-      html+=`<div class="lib-row" onclick="libQuickAdd('${e.n.replace(/'/g,"\\'")}','${e.equip}')">
-        <div><div class="lib-name">${e.n}<span class="equip-tag ${EQUIP_TAG_CLASS[e.equip]||''}" style="margin-left:6px">${EQUIP_TAG_SHORT[e.equip]||''}</span>${isCustom?'<span class="equip-tag tag-bw" style="margin-left:4px">My</span>':''}</div><div class="lib-cat">${e.c}</div></div>
-        <span class="lib-plus">+</span>
-      </div>`;
-    });
+    groups[eq].forEach(e=>{html+=libRow(e);});
   });
   html+='</div>';
   document.getElementById('lib-list').innerHTML=html;
