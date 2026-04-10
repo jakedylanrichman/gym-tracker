@@ -563,7 +563,7 @@ select.finput{appearance:none;}
       <label>Exercise name</label>
       <input type="text" class="finput" id="ex-name-in" placeholder="e.g. Dumbbell curl" name="exercise-search" oninput="filterSug()" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"/>
     </div>
-    <div id="sug-list" style="margin-bottom:8px;"></div>
+    <div id="sug-list" style="margin-bottom:8px;max-height:200px;overflow-y:auto;"></div>
     <div class="field">
       <label>Equipment type</label>
       <div class="equip-row" id="equip-row">
@@ -575,6 +575,7 @@ select.finput{appearance:none;}
         <button class="equip-btn" onclick="setEquip('machine')">Machine</button>
         <button class="equip-btn" onclick="setEquip('cable')">Cable</button>
       </div>
+      <div id="equip-auto-label" style="display:none;font-size:13px;color:var(--text2);padding:2px 0;"></div>
     </div>
     <div class="field-row2">
       <div class="field"><label>Sets</label>
@@ -676,6 +677,8 @@ let bodyweight=[];
 let progFilter='3M';
 let libCat='All';
 let currentEquip='barbell';
+let equipFromLib=false;
+let equipFromLibName='';
 let editSessionId=null;
 let editExSessionId=null;
 let editExId=null;
@@ -1317,13 +1320,31 @@ function matchesSearch(name,query){
   const n=name.toLowerCase();
   return words.every(w=>n.includes(w));
 }
+function resetEquipModal(){
+  currentEquip='barbell';equipFromLib=false;equipFromLibName='';
+  document.querySelectorAll('.equip-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('equip-row').style.display='';
+  document.getElementById('equip-auto-label').style.display='none';
+  updateWeightUI();
+}
+function setEquipFromLib(equip,name){
+  currentEquip=equip||'barbell';equipFromLib=true;equipFromLibName=name;
+  document.getElementById('equip-row').style.display='none';
+  const lbl=document.getElementById('equip-auto-label');
+  lbl.textContent='Equipment: '+(EQUIP_LABELS[currentEquip]||currentEquip);
+  lbl.style.display='';
+  updateWeightUI();
+}
 function filterSug(){
-  const q=document.getElementById('ex-name-in').value.toLowerCase().trim();
-  const box=document.getElementById('sug-list');box.innerHTML='';if(!q)return;
-  fullLibrary().filter(e=>matchesSearch(e.n,q)).slice(0,6).forEach(e=>{
+  const q=document.getElementById('ex-name-in').value.trim();
+  const box=document.getElementById('sug-list');box.innerHTML='';
+  // if user changed text after a lib pick, restore the selector
+  if(equipFromLib&&q.toLowerCase()!==equipFromLibName.toLowerCase())resetEquipModal();
+  if(!q)return;
+  fullLibrary().filter(e=>matchesSearch(e.n,q.toLowerCase())).forEach(e=>{
     const d=document.createElement('div');d.className='sug-item';
     d.innerHTML=`<span>${e.n}</span><span class="equip-tag ${EQUIP_TAG_CLASS[e.equip]||''}">${EQUIP_TAG_SHORT[e.equip]||''}</span>`;
-    d.onclick=()=>{document.getElementById('ex-name-in').value=e.n;setEquip(e.equip||'barbell');box.innerHTML='';};
+    d.onclick=()=>{document.getElementById('ex-name-in').value=e.n;setEquipFromLib(e.equip||'barbell',e.n);box.innerHTML='';};
     box.appendChild(d);
   });
 }
@@ -1334,7 +1355,7 @@ function openAddEx(sessId){
   document.getElementById('ex-name-in').value='';document.getElementById('sug-list').innerHTML='';
   document.getElementById('ex-sets-in').value='4';document.getElementById('ex-reps-in').value='';
   document.getElementById('ex-weight-in').value='';document.getElementById('save-to-lib').checked=false;
-  setEquip('barbell');document.getElementById('ex-modal').classList.add('open');
+  resetEquipModal();document.getElementById('ex-modal').classList.add('open');
   setTimeout(()=>document.getElementById('ex-name-in').focus(),120);
 }
 function openEditEx(sessId,exId){
