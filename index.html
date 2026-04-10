@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Gym Tracker"/>
 <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no"/>
 <title>Gym Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root{
   --bg:#ffffff;--bg2:#F7F7F5;--bg3:#EFEFED;
@@ -288,10 +289,47 @@ select.finput{appearance:none;}
 .sess-save-btn:active{opacity:.85;}
 /* EXERCISE COUNT BADGE */
 .ex-count-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg2);color:var(--text2);}
+/* AUTH SCREEN */
+.auth-screen{position:fixed;inset:0;background:var(--bg3);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;}
+.auth-card{background:var(--bg);border-radius:28px;padding:32px 24px 28px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,0.10);}
+.auth-icon{font-size:48px;text-align:center;margin-bottom:10px;}
+.auth-title{font-size:26px;font-weight:700;text-align:center;letter-spacing:-0.5px;margin-bottom:6px;}
+.auth-sub{font-size:14px;color:var(--text2);text-align:center;margin-bottom:24px;line-height:1.5;}
+.auth-error{font-size:13px;font-weight:600;padding:10px 14px;border-radius:var(--radius-xs);margin-bottom:14px;text-align:center;background:var(--red-bg);color:var(--red);}
+.auth-divider{text-align:center;font-size:13px;color:var(--text3);margin:10px 0;}
+@keyframes auth-spin{to{transform:rotate(360deg);}}
+.auth-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:auth-spin .6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px;}
 </style>
 </head>
 <body>
-<div class="app">
+<!-- AUTH SCREEN -->
+<div id="auth-screen" class="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-icon">🏋️</div>
+    <div class="auth-title">Gym Tracker</div>
+    <div class="auth-sub" id="auth-sub">Sign in to sync your workouts across all your devices.</div>
+    <div class="auth-error" id="auth-error" style="display:none"></div>
+    <div class="field"><label>Email</label><input type="email" class="finput" id="auth-email" placeholder="you@example.com" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')document.getElementById('auth-password').focus()"/></div>
+    <div class="field"><label>Password</label><input type="password" class="finput" id="auth-password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()"/></div>
+    <button class="sbtn sbtn-orange" style="width:100%;margin-bottom:10px" id="auth-primary-btn" onclick="authSubmit()">Sign in</button>
+    <div class="auth-divider">or</div>
+    <button class="sbtn" style="width:100%" id="auth-toggle-btn" onclick="authToggleMode()">Create account</button>
+  </div>
+</div>
+
+<!-- MIGRATE OVERLAY -->
+<div class="confirm-overlay" id="migrate-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">Import local data?</div>
+    <div class="confirm-msg" id="migrate-msg">Found existing workouts on this device. Move them to your cloud account?</div>
+    <div class="confirm-btns">
+      <button class="sbtn" style="flex:1" onclick="dismissMigrate()">Skip</button>
+      <button class="sbtn sbtn-orange" style="flex:1" onclick="doMigrate()">Import to cloud</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" style="display:none">
   <div class="header">
     <div class="header-top">
       <div><h1 id="pg-title">Sessions</h1><div class="header-sub" id="pg-sub"></div></div>
@@ -395,6 +433,13 @@ select.finput{appearance:none;}
           Import file
           <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)"/>
         </label>
+      </div>
+    </div>
+    <div class="slabel" style="margin-top:20px;">Account</div>
+    <div class="card" style="padding:0;">
+      <div style="padding:14px 16px;">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;" id="account-email-line">Signed in</div>
+        <button class="data-btn data-btn-outline" style="width:100%" onclick="signOutUser()">Sign out</button>
       </div>
     </div>
   </div>
@@ -586,8 +631,132 @@ function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function saveSessions(){
   lsSet('ft_sessions',sessions);
   try{localStorage.setItem('ft_sessions_backup',JSON.stringify(sessions));}catch(e){}
+  syncSessionsToCloud();
 }
-function saveCustomLib(){lsSet('ft_custom_lib',customLibrary);}
+function saveCustomLib(){lsSet('ft_custom_lib',customLibrary);syncCustomLibToCloud();}
+
+/* ── SUPABASE ── */
+const _SURL='https://xpcbrzgdbhgjgwxmvhlm.supabase.co';
+const _SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwY2JyemdkYmhnamd3eG12aGxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MjU4OTksImV4cCI6MjA5MTQwMTg5OX0.Kx8SxLn4EzuyX_9FYOXc58sIs880L6wtI6eFufh0c64';
+const _sb=window.supabase.createClient(_SURL,_SKEY);
+let currentUser=null;
+let _authMode='signin';
+let _migrateLsSess=[],_migrateLsLib=[];
+
+async function syncSessionsToCloud(){
+  if(!currentUser)return;
+  try{
+    const rows=sessions.map(s=>({id:s.id,user_id:currentUser.id,date:s.date,tod:s.tod,dur:s.dur,label:s.label||null,exercises:s.exercises}));
+    if(rows.length)await _sb.from('sessions').upsert(rows,{onConflict:'id'});
+  }catch(e){}
+}
+async function syncCustomLibToCloud(){
+  if(!currentUser)return;
+  try{
+    const rows=customLibrary.map(e=>{if(!e.id)e.id=uid();return{id:e.id,user_id:currentUser.id,name:e.n,category:e.c||'Custom',equip:e.equip};});
+    if(rows.length)await _sb.from('custom_library').upsert(rows,{onConflict:'id'});
+  }catch(e){}
+}
+async function deleteSessionCloud(id){
+  if(!currentUser)return;
+  try{await _sb.from('sessions').delete().eq('id',id).eq('user_id',currentUser.id);}catch(e){}
+}
+async function loadCloudData(){
+  try{
+    const[{data:sData},{data:lData}]=await Promise.all([
+      _sb.from('sessions').select('*').eq('user_id',currentUser.id),
+      _sb.from('custom_library').select('*').eq('user_id',currentUser.id)
+    ]);
+    const cloudSess=(sData||[]).map(r=>({id:r.id,date:r.date,tod:r.tod,dur:r.dur,label:r.label||'',exercises:r.exercises||[]}));
+    const cloudLib=(lData||[]).map(r=>({id:r.id,n:r.name,c:r.category||'Custom',equip:r.equip}));
+    const lsSess=lsGet('ft_sessions')||[];
+    const lsLib=lsGet('ft_custom_lib')||[];
+    if((lsSess.length>0||lsLib.length>0)&&cloudSess.length===0&&cloudLib.length===0){
+      _migrateLsSess=lsSess;_migrateLsLib=lsLib;
+      sessions=[];customLibrary=[];
+      renderSessions();renderLib();renderProgress();
+      const n=lsSess.length;
+      document.getElementById('migrate-msg').textContent='Found '+n+' session'+(n!==1?'s':'')+' and '+lsLib.length+' custom exercise'+(lsLib.length!==1?'s':'')+' on this device. Move them to your cloud account?';
+      document.getElementById('migrate-overlay').classList.add('open');
+    }else{
+      sessions=cloudSess;customLibrary=cloudLib;
+      lsSet('ft_sessions',sessions);lsSet('ft_custom_lib',customLibrary);
+      renderSessions();renderLib();renderProgress();
+    }
+  }catch(e){
+    const s=lsGet('ft_sessions');if(s&&Array.isArray(s))sessions=s;
+    const l=lsGet('ft_custom_lib');if(l&&Array.isArray(l))customLibrary=l;
+    renderSessions();renderLib();renderProgress();
+  }
+}
+async function doMigrate(){
+  document.getElementById('migrate-overlay').classList.remove('open');
+  sessions=_migrateLsSess;customLibrary=_migrateLsLib;
+  lsSet('ft_sessions',sessions);lsSet('ft_custom_lib',customLibrary);
+  renderSessions();renderLib();renderProgress();
+  await syncSessionsToCloud();await syncCustomLibToCloud();
+  toast('Data imported to cloud!');
+}
+function dismissMigrate(){
+  document.getElementById('migrate-overlay').classList.remove('open');
+  renderSessions();renderLib();renderProgress();
+}
+function showAuthScreen(){document.getElementById('auth-screen').style.display='flex';document.querySelector('.app').style.display='none';}
+function hideAuthScreen(){document.getElementById('auth-screen').style.display='none';document.querySelector('.app').style.display='';}
+function authToggleMode(){
+  _authMode=_authMode==='signin'?'signup':'signin';
+  const su=_authMode==='signup';
+  document.getElementById('auth-sub').textContent=su?'Create an account to sync your workouts.':'Sign in to sync your workouts across all your devices.';
+  document.getElementById('auth-primary-btn').textContent=su?'Create account':'Sign in';
+  document.getElementById('auth-toggle-btn').textContent=su?'Back to sign in':'Create account';
+  document.getElementById('auth-error').style.display='none';
+}
+async function authSubmit(){
+  const email=document.getElementById('auth-email').value.trim();
+  const password=document.getElementById('auth-password').value;
+  const errEl=document.getElementById('auth-error');
+  const btn=document.getElementById('auth-primary-btn');
+  if(!email||!password){errEl.textContent='Please enter your email and password.';errEl.style.cssText='display:block;background:var(--red-bg);color:var(--red);';return;}
+  btn.disabled=true;
+  btn.innerHTML='<span class="auth-spinner"></span>'+(_authMode==='signup'?'Creating account...':'Signing in...');
+  errEl.style.display='none';
+  const{data,error}=_authMode==='signup'
+    ?await _sb.auth.signUp({email,password})
+    :await _sb.auth.signInWithPassword({email,password});
+  btn.disabled=false;
+  btn.textContent=_authMode==='signup'?'Create account':'Sign in';
+  if(error){errEl.textContent=error.message;errEl.style.cssText='display:block;background:var(--red-bg);color:var(--red);';return;}
+  if(_authMode==='signup'&&data.user&&!data.session){
+    errEl.textContent='Check your email to confirm your account, then sign in.';
+    errEl.style.cssText='display:block;background:var(--green-bg);color:var(--green-text);';return;
+  }
+  currentUser=data.user||data.session?.user;
+  hideAuthScreen();
+  updateAccountLine();
+  await loadCloudData();
+}
+async function signOutUser(){
+  await _sb.auth.signOut();
+  currentUser=null;sessions=[];customLibrary=[];
+  showAuthScreen();
+  toast('Signed out');
+}
+async function checkAuth(){
+  const{data:{session}}=await _sb.auth.getSession();
+  if(session){
+    currentUser=session.user;
+    hideAuthScreen();
+    updateAccountLine();
+    await loadCloudData();
+  }else{
+    showAuthScreen();
+  }
+}
+function updateAccountLine(){
+  const el=document.getElementById('account-email-line');
+  if(el&&currentUser)el.textContent='Signed in as '+currentUser.email;
+}
+
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function fullLibrary(){
   // merge DB_EXERCISES with custom library, custom takes precedence
@@ -1236,7 +1405,7 @@ function confirmDeleteSession(id){
   const sess=sessions.find(s=>s.id===id);if(!sess)return;
   document.getElementById('confirm-title').textContent='Delete session?';
   document.getElementById('confirm-msg').textContent=`This will permanently remove "${sess.label||sess.tod+' session'}" and all its exercises.`;
-  document.getElementById('confirm-ok').onclick=()=>{sessions=sessions.filter(s=>s.id!==id);saveSessions();renderSessions();renderProgress();closeConfirm();toast('Session deleted','var(--red)');};
+  document.getElementById('confirm-ok').onclick=()=>{deleteSessionCloud(id);sessions=sessions.filter(s=>s.id!==id);saveSessions();renderSessions();renderProgress();closeConfirm();toast('Session deleted','var(--red)');};
   document.getElementById('confirm-overlay').classList.add('open');
 }
 function confirmDeleteEx(sessId,exId){
@@ -1508,14 +1677,8 @@ function renderCalDetail(){
 
 /* ── INIT ── */
 (function(){
-  const s=lsGet('ft_sessions');
-  if(s&&Array.isArray(s)&&s.length>0){sessions=s;}
-  else{
-    // restore from backup if main is empty/missing
-    try{const b=JSON.parse(localStorage.getItem('ft_sessions_backup'));if(b&&Array.isArray(b)&&b.length>0){sessions=b;lsSet('ft_sessions',sessions);}}catch(e){}
-  }
-  const l=lsGet('ft_custom_lib');if(l&&Array.isArray(l))customLibrary=l;
-  renderSessions();renderLib();renderProgress();buildPresets();drawTimer(T.total);
+  buildPresets();drawTimer(T.total);
+  checkAuth();
 })();
 </script>
 </body>
